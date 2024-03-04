@@ -1,18 +1,18 @@
-module Language.Refal.Types (
-  EvaluationError (..),
-  VarKind (..),
-  Var (..),
-  Symbol (..),
-  PatternExpression (..),
-  ResultExpression (..),
-  ObjectExpression (..),
-  ActiveExpression (..),
-  Sentence (..),
-  RFunction (..),
-  HFunction (..),
-  Function (..),
-  Program (..),
-)
+module Language.Refal.Types
+  ( EvaluationError (..),
+    VarKind (..),
+    Var (..),
+    Symbol (..),
+    PatternExpression (..),
+    ResultExpression (..),
+    ObjectExpression (..),
+    ActiveExpression (..),
+    Sentence (..),
+    RFunction (..),
+    HFunction (..),
+    Function (..),
+    Program (..),
+  )
 where
 
 data EvaluationError
@@ -39,7 +39,7 @@ data Symbol
   | Int Integer
   | Char Char
   | Bool Bool
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 -- Expressions that exist before the evaluation
 
@@ -47,25 +47,29 @@ data PatternExpression
   = PSym Symbol
   | PSt [PatternExpression]
   | PVar Var
+  deriving (Show)
 
 data ResultExpression
   = RSym Symbol
   | RSt [ResultExpression]
-  | RCall String ResultExpression
+  | RCall String [ResultExpression]
   | RVar Var
+  deriving (Show)
 
 -- Expressions that exist during the evaluation
 
 data ObjectExpression
   = OSym Symbol
   | OSt [ObjectExpression]
+  deriving (Show, Eq, Ord)
 
 data ActiveExpression
   = ASym Symbol
   | ASt [ActiveExpression]
-  | ACall String ActiveExpression
+  | ACall String [ActiveExpression]
+  deriving (Show)
 
-data Sentence = Sentence PatternExpression ActiveExpression
+data Sentence = Sentence [PatternExpression] ActiveExpression
 
 newtype RFunction = RFunction [Sentence]
 
