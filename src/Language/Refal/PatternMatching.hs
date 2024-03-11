@@ -1,57 +1,57 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Language.Refal.PatternMatching (Substitutions, mkPOP) where
+module Language.Refal.PatternMatching (matchPattern, Substitution) where
 
-import Control.Monad.Identity
-import Control.Monad.State
-import Data.Void (Void)
+import Control.Applicative
 import Language.Refal.Types
-import Text.Megaparsec
 
-type Substitutions = [(Var, ObjectExpression)]
+type Substitution = (Var, ObjectExpression)
 
-type POP = StateT Substitutions (ParsecT Void [ObjectExpression] Identity)
+matchPattern :: [PatternExpression] -> [ObjectExpression] -> Maybe [Substitution]
+matchPattern = matchPattern' []
 
-lookupVar :: Monad m => Var -> StateT Substitutions m (Maybe ObjectExpression)
-lookupVar = gets . lookup
-
-putVar :: Monad m => Var -> ObjectExpression -> StateT Substitutions m ()
-putVar v o = modify ((v, o) :)
-
-mkPOP :: [PatternExpression] -> POP ()
-mkPOP [] = eof
-mkPOP ((PSym psym) : xs) = satisfy p >> mkPOP xs
+matchPattern' :: [Substitution] -> [PatternExpression] -> [ObjectExpression] -> Maybe [Substitution]
+matchPattern' subs [] = \case
+  [] -> pure subs
+  _ -> Nothing
+matchPattern' subs ((PSym p) : ps) = \case
+  ((OSym o) : os) ->
+    if p == o
+      then matchPattern' subs ps os
+      else Nothing
+  _ -> Nothing
+matchPattern' subs ((PVar v@(Var S _)) : ps) = \case
+  (ox@(OSym _) : os) -> case lookup v subs of
+    Just defined ->
+      if ox == defined
+        then matchPattern' subs ps os
+        else Nothing
+    Nothing -> matchPattern' ((v, ox) : subs) ps os
+  _ -> Nothing
+matchPattern' subs ((PVar v@(Var T _)) : ps) = \case
+  (ox : os) -> case lookup v subs of
+    Just defined ->
+      if ox == defined
+        then matchPattern' subs ps os
+        else Nothing
+    Nothing -> matchPattern' ((v, ox) : subs) ps os
+  _ -> Nothing
+matchPattern' subs ((PVar v@(Var E _)) : ps) = \case
+  o@(ox : os) -> case lookup v subs of
+    (Just defined) ->
+      if ox == defined
+        then matchPattern' subs ps os
+        else Nothing
+    _ -> takeUntilNextMatches [] o
+  _ -> Nothing
   where
-    p (OSym osym) = psym == osym
-    p _ = False
-mkPOP ((PVar v@(Var S _)) : xs) =
-  ( lookupVar v
-      >>= maybe
-        (satisfy isOSym >>= putVar v)
-        (\o1 -> void $ satisfy $ \o2 -> isOSym o2 && o1 == o2)
-  )
-    >> mkPOP xs
-  where
-    isOSym (OSym _) = True
-    isOSym _ = False
-mkPOP ((PVar v@(Var T _)) : xs) =
-  ( lookupVar v
-      >>= maybe
-        (anySingle >>= putVar v)
-        (void . satisfy . (==))
-  )
-    >> mkPOP xs
-mkPOP ((PVar v@(Var E _)) : xs) =
-  ( lookupVar v
-      >>= maybe
-        ( case xs of
-            [] -> takeRest >>= putVar v . OSt
-            (x' : xs') -> undefined
-        )
-        ( \case
-            (OSt elts) -> mapM_ (satisfy . (==)) elts
-            _ -> error "An e-type variable was bound to a value, with a constructor other than OSt"
-        )
-  )
-    >> mkPOP xs
-mkPOP ((PSt elts) : xs) = undefined
+    takeUntilNextMatches elts o =
+      matchPattern' ((v, OSt elts) : subs) ps o
+        <|> case o of
+          (ox : os) -> takeUntilNextMatches (elts <> [ox]) os
+          [] -> pure [(v, OSt elts)]
+matchPattern' subs ((PSt p) : ps) = \case
+  ((OSt o) : os) -> do
+    subs' <- matchPattern' subs p o
+    matchPattern' subs' ps os
+  _ -> Nothing

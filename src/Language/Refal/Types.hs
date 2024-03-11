@@ -1,18 +1,18 @@
-module Language.Refal.Types
-  ( EvaluationError (..),
-    VarKind (..),
-    Var (..),
-    Symbol (..),
-    PatternExpression (..),
-    ResultExpression (..),
-    ObjectExpression (..),
-    ActiveExpression (..),
-    Sentence (..),
-    RFunction (..),
-    HFunction (..),
-    Function (..),
-    Program (..),
-  )
+module Language.Refal.Types (
+  EvaluationError (..),
+  VarKind (..),
+  Var (..),
+  Symbol (..),
+  PatternExpression (..),
+  ResultExpression (..),
+  ObjectExpression (..),
+  ActiveExpression (..),
+  Sentence (..),
+  RFunction (..),
+  HFunction (..),
+  Function (..),
+  Program (..),
+)
 where
 
 data EvaluationError
@@ -38,7 +38,6 @@ data Symbol
   = None
   | Int Integer
   | Char Char
-  | Bool Bool
   deriving (Eq, Ord, Show)
 
 -- Expressions that exist before the evaluation

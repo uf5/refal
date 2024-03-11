@@ -13,7 +13,7 @@ common shared
     -fprint-explicit-kinds
 
   default-extensions:
-    ImportQualifiedPost,
+    ImportQualifiedPost
     ImportQualifiedPost
 
   build-depends:
@@ -24,27 +24,25 @@ common shared
   default-language:   Haskell2010
 
 library refal-lib
-  import:        shared
-  hs-source-dirs:     src
-  exposed-modules:
-    Language.Refal
+  import:          shared
+  hs-source-dirs:  src
+  exposed-modules: Language.Refal
   other-modules:
     Language.Refal.Evaluator
     Language.Refal.PatternMatching
     Language.Refal.Types
 
 executable refal-exe
-  import:        shared
-  hs-source-dirs:     app
-  main-is:       Main.hs
-  build-depends:
-    , refal-lib
+  import:         shared
+  hs-source-dirs: app
+  main-is:        Main.hs
+  build-depends:  refal-lib
 
 test-suite test
-  import: shared
-  type: exitcode-stdio-1.0
+  import:         shared
+  type:           exitcode-stdio-1.0
   hs-source-dirs: test
-  main-is: Main.hs
+  main-is:        Main.hs
   build-depends:
-    , refal-lib
     , hspec
+    , refal-lib

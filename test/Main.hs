@@ -1,39 +1,45 @@
 module Main where
 
-import Control.Monad.Identity
-import Control.Monad.State
 import Language.Refal
 import Test.Hspec
-import Text.Megaparsec
 
 main :: IO ()
 main = hspec $ do
   describe "pattern matching" $ do
     it "s-type" $ do
-      testPattern
+      matchPattern
         [PVar (Var S "foo"), PVar (Var S "bar"), PVar (Var S "foo")]
         [OSym (Int 1), OSym (Int 2), OSym (Int 1)]
-        `shouldBe` Right
+        `shouldBe` Just
           [ (Var S "bar", OSym (Int 2)),
             (Var S "foo", OSym (Int 1))
           ]
-  where
-    testPattern p o = runIdentity (runParserT (execStateT (mkPOP p) []) "" o)
-
--- main :: IO ()
--- main = do
---   print $ testPattern p o
---   print $ testPattern p' o'
---   print $ testPattern p'' o''
---   where
---     p = [PVar (Var S "foo"), PVar (Var S "foo"), PVar (Var S "bar")]
---     o = [OSym (Int 1), OSym (Int 1), OSym (Int 3)]
---     p' = [PVar (Var T "foo"), PVar (Var T "foo")]
---     o' = [OSt [OSym (Int 1), OSym (Int 2)], OSt [OSym (Int 1), OSym (Int 2)]]
---     p'' = [PVar (Var T "foo"), PVar (Var E "bar")]
---     o'' = [OSym (Int 1), OSym (Int 2), OSym (Int 3), OSt [OSym (Int 4), OSym (Int 5)]]
---
--- testPattern p o = either2maybe (runIdentity (runParserT (runStateT (mkPOP p) []) "" o))
---   where
---     either2maybe (Right a) = pure a
---     either2maybe _ = Nothing
+    it "e-type" $ do
+      matchPattern
+        [PVar (Var E "foo"), PSym (Int 0)]
+        [OSym (Int 1), OSym (Int 2), OSym (Int 3), OSym (Int 0)]
+        `shouldBe` Just
+          [ (Var E "foo", OSt [OSym (Int 1), OSym (Int 2), OSym (Int 3)])
+          ]
+      matchPattern
+        [PVar (Var E "foo"), PVar (Var E "bar")]
+        [OSym (Int 1), OSym (Int 2), OSym (Int 3)]
+        `shouldBe` Just
+          [ (Var E "bar", OSt [OSym (Int 1), OSym (Int 2), OSym (Int 3)]),
+            (Var E "foo", OSt [])
+          ]
+      matchPattern
+        [PVar (Var E "foo"), PVar (Var E "bar"), PSym (Int 0)]
+        [OSym (Int 1), OSym (Int 2), OSym (Int 3), OSym (Int 0)]
+        `shouldBe` Just
+          [ (Var E "bar", OSt [OSym (Int 1), OSym (Int 2), OSym (Int 3)]),
+            (Var E "foo", OSt [])
+          ]
+    it "structural parentheses test" $ do
+      matchPattern
+        [PSt [PVar (Var E "foo"), PVar (Var E "bar"), PSym (Int 0)]]
+        [OSt [OSym (Int 1), OSym (Int 2), OSym (Int 3), OSym (Int 0)]]
+        `shouldBe` Just
+          [ (Var E "bar", OSt [OSym (Int 1), OSym (Int 2), OSym (Int 3)]),
+            (Var E "foo", OSt [])
+          ]
