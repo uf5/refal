@@ -46,7 +46,7 @@ data PatternExpression
   = PSym Symbol
   | PSt [PatternExpression]
   | PVar Var
-  deriving (Show)
+  deriving (Eq, Show)
 
 data ResultExpression
   = RSym Symbol

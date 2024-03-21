@@ -35,6 +35,35 @@ main = hspec $ do
           [ (Var E "bar", OSt [OSym (Int 1), OSym (Int 2), OSym (Int 3)]),
             (Var E "foo", OSt [])
           ]
+    it "e-type repeating" $ do
+      matchPattern
+        [PVar (Var E "foo"), PVar (Var E "foo")]
+        [OSym (Int 1), OSym (Int 2), OSym (Int 1), OSym (Int 2)]
+        `shouldBe` Just
+          [ (Var E "foo", OSt [OSym (Int 1), OSym (Int 2)])
+          ]
+      matchPattern
+        [PVar (Var E "foo"), PVar (Var E "foo")]
+        [OSym (Int 1), OSym (Int 2), OSym (Int 3), OSym (Int 1), OSym (Int 2), OSym (Int 3)]
+        `shouldBe` Just
+          [ (Var E "foo", OSt [OSym (Int 1), OSym (Int 2), OSym (Int 3)])
+          ]
+      matchPattern
+        [PVar (Var E "foo"), PVar (Var E "foo"), PVar (Var E "foo")]
+        [OSym (Int 1), OSym (Int 2), OSym (Int 3), OSym (Int 1), OSym (Int 2), OSym (Int 3), OSym (Int 1), OSym (Int 2), OSym (Int 3)]
+        `shouldBe` Just
+          [ (Var E "foo", OSt [OSym (Int 1), OSym (Int 2), OSym (Int 3)])
+          ]
+      matchPattern
+        [PVar (Var E "foo"), PVar (Var E "foo"), PVar (Var E "foo")]
+        []
+        `shouldBe` Just
+          [(Var E "foo", OSt [])]
+      matchPattern
+        [PVar (Var E "foo"), PVar (Var E "foo")]
+        []
+        `shouldBe` Just
+          [(Var E "foo", OSt [])]
     it "structural parentheses test" $ do
       matchPattern
         [PSt [PVar (Var E "foo"), PVar (Var E "bar"), PSym (Int 0)]]
