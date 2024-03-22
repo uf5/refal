@@ -16,6 +16,20 @@ main = hspec $ do
           ]
     it "e-type" $ do
       matchPattern
+        [PVar (Var S "bar"), PVar (Var E "foo")]
+        [OSym (Int 0), OSym (Int 1), OSym (Int 2), OSym (Int 1), OSym (Int 2)]
+        `shouldBe` Just
+          [ (Var S "bar", OSym (Int 0)),
+            (Var E "foo", OSt [OSym (Int 1), OSym (Int 2), OSym (Int 1), OSym (Int 2)])
+          ]
+      matchPattern
+        [PVar (Var S "bar"), PVar (Var E "foo"), PSym (Int 2)]
+        [OSym (Int 0), OSym (Int 1), OSym (Int 2), OSym (Int 1), OSym (Int 2)]
+        `shouldBe` Just
+          [ (Var S "bar", OSym (Int 0)),
+            (Var E "foo", OSt [OSym (Int 1), OSym (Int 2), OSym (Int 1)])
+          ]
+      matchPattern
         [PVar (Var E "foo"), PSym (Int 0)]
         [OSym (Int 1), OSym (Int 2), OSym (Int 3), OSym (Int 0)]
         `shouldBe` Just
@@ -64,6 +78,13 @@ main = hspec $ do
         []
         `shouldBe` Just
           [(Var E "foo", OSt [])]
+      matchPattern
+        [PVar (Var S "bar"), PVar (Var E "foo"), PVar (Var E "foo")]
+        [OSym (Int 0), OSym (Int 1), OSym (Int 2), OSym (Int 1), OSym (Int 2)]
+        `shouldBe` Just
+          [ (Var S "bar", OSym (Int 0)),
+            (Var E "foo", OSt [OSym (Int 1), OSym (Int 2)])
+          ]
     it "structural parentheses test" $ do
       matchPattern
         [PSt [PVar (Var E "foo"), PVar (Var E "bar"), PSym (Int 0)]]
