@@ -19,7 +19,6 @@ common shared
   build-depends:
     , base        >=4.13.0.0 && <4.18.0.0.0
     , megaparsec
-    , mtl
 
   default-language:   Haskell2010
 
@@ -29,6 +28,7 @@ library refal-lib
   exposed-modules: Language.Refal
   other-modules:
     Language.Refal.Evaluator
+    Language.Refal.Parser
     Language.Refal.PatternMatching
     Language.Refal.Types
 

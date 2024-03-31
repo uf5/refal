@@ -35,8 +35,7 @@ instance Show Var where
   show (Var k v) = show k <> "." <> v
 
 data Symbol
-  = None
-  | Int Integer
+  = Int Integer
   | Char Char
   deriving (Eq, Ord, Show)
 
@@ -68,9 +67,11 @@ data ActiveExpression
   | ACall String [ActiveExpression]
   deriving (Show)
 
-data Sentence = Sentence [PatternExpression] ActiveExpression
+data Sentence = Sentence [PatternExpression] ResultExpression
+  deriving (Show)
 
 newtype RFunction = RFunction [Sentence]
+  deriving (Show)
 
 newtype HFunction
   = HFunction
@@ -81,3 +82,4 @@ data Function
   | Builtin HFunction
 
 newtype Program = Program [(String, RFunction)]
+  deriving (Show)
