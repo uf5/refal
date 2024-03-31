@@ -6,22 +6,26 @@ module Language.Refal.Types (
   PatternExpression (..),
   ResultExpression (..),
   ObjectExpression (..),
-  ActiveExpression (..),
   Sentence (..),
   RFunction (..),
   HFunction (..),
   Function (..),
   Program (..),
+  Program' (..),
 )
 where
 
 data EvaluationError
-  = NotDefined String
+  = FnNotDefined String
+  | VarNotDefined Var
+  | NoMain
   | NoMatchingPattern
   | DivisionByZero
 
 instance Show EvaluationError where
-  show (NotDefined name) = "Name `" <> name <> "` is undefined"
+  show NoMain = "Program has no `main' function"
+  show (FnNotDefined name) = "Function `" <> name <> "` is undefined"
+  show (VarNotDefined var) = "Variable `" <> show var <> "` is undefined"
   show NoMatchingPattern = "No matching pattern"
   show DivisionByZero = "Division by zero"
 
@@ -54,18 +58,12 @@ data ResultExpression
   | RVar Var
   deriving (Show)
 
--- Expressions that exist during the evaluation
+-- Expression that exists during the evaluation
 
 data ObjectExpression
   = OSym Symbol
   | OSt [ObjectExpression]
   deriving (Show, Eq, Ord)
-
-data ActiveExpression
-  = ASym Symbol
-  | ASt [ActiveExpression]
-  | ACall String [ActiveExpression]
-  deriving (Show)
 
 data Sentence = Sentence [PatternExpression] ResultExpression
   deriving (Show)
@@ -75,7 +73,7 @@ newtype RFunction = RFunction [Sentence]
 
 newtype HFunction
   = HFunction
-      (ObjectExpression -> Either EvaluationError ObjectExpression)
+      ([ObjectExpression] -> Either EvaluationError ObjectExpression)
 
 data Function
   = UserDefined RFunction
@@ -83,3 +81,5 @@ data Function
 
 newtype Program = Program [(String, RFunction)]
   deriving (Show)
+
+newtype Program' = Program' [(String, Function)]
