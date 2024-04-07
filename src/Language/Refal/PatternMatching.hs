@@ -9,21 +9,24 @@ import Language.Refal.Types
 type Substitution = (Var, ObjectExpression)
 
 matchPattern :: [PatternExpression] -> [ObjectExpression] -> Maybe [Substitution]
-matchPattern p o = subs2subs <$> matchPattern' emptySubs p o
+matchPattern p o = flattenSubs <$> matchPattern' mempty p o
   where
-    subs2subs Substitution' {stType = s, eType = e} = s <> map (second OSt) e
-    emptySubs = Substitution' {stType = [], eType = []}
+    flattenSubs Substitution' {sType = s, tType = t, eType = e} = map (second OSym) s <> t <> map (second OSt) e
 
 data Substitution' = Substitution'
-  { stType :: [(Var, ObjectExpression)],
+  { sType :: [(Var, Symbol)],
+    tType :: [(Var, ObjectExpression)],
     eType :: [(Var, [ObjectExpression])]
   }
+  deriving (Show)
 
-consStType :: Var -> ObjectExpression -> Substitution' -> Substitution'
-consStType v x subs = (subs {stType = (v, x) : stType subs})
+instance Semigroup Substitution' where
+  Substitution' {sType = s1, tType = t1, eType = e1}
+    <> Substitution' {sType = s2, tType = t2, eType = e2} =
+      Substitution' {sType = s1 <> s2, tType = t1 <> t2, eType = e1 <> e2}
 
-consEType :: Var -> [ObjectExpression] -> Substitution' -> Substitution'
-consEType v x subs = (subs {eType = (v, x) : eType subs})
+instance Monoid Substitution' where
+  mempty = Substitution' {sType = mempty, tType = mempty, eType = mempty}
 
 matchPattern' :: Substitution' -> [PatternExpression] -> [ObjectExpression] -> Maybe Substitution'
 matchPattern' subs [] [] = pure subs
@@ -31,18 +34,18 @@ matchPattern' subs ((PSym p) : ps) ((OSym o) : os) =
   if p == o
     then matchPattern' subs ps os
     else Nothing
-matchPattern' subs ((PVar v@(Var S _)) : ps) (ox@(OSym _) : os) = case lookup v (stType subs) of
+matchPattern' subs ((PVar v@(Var S _)) : ps) ((OSym sx) : os) = case lookup v (sType subs) of
+  Just defined ->
+    if sx == defined
+      then matchPattern' subs ps os
+      else Nothing
+  Nothing -> matchPattern' (mempty {sType = [(v, sx)]} <> subs) ps os
+matchPattern' subs ((PVar v@(Var T _)) : ps) (ox : os) = case lookup v (tType subs) of
   Just defined ->
     if ox == defined
       then matchPattern' subs ps os
       else Nothing
-  Nothing -> matchPattern' (consStType v ox subs) ps os
-matchPattern' subs ((PVar v@(Var T _)) : ps) (ox : os) = case lookup v (stType subs) of
-  Just defined ->
-    if ox == defined
-      then matchPattern' subs ps os
-      else Nothing
-  Nothing -> matchPattern' (consStType v ox subs) ps os
+  Nothing -> matchPattern' (mempty {tType = [(v, ox)]} <> subs) ps os
 matchPattern' subs (px@(PVar v@(Var E _)) : ps) o =
   case lookup v (eType subs) of
     (Just eltsDefined) ->
@@ -52,12 +55,17 @@ matchPattern' subs (px@(PVar v@(Var E _)) : ps) o =
             else undefined
     Nothing -> repeating <|> takeUntilNextMatches o
   where
+    -- \| find a substitutiton with the least amount of elements, so that the next pattern is statisfied.
     takeUntilNextMatches = takeUntilNextMatches' []
-    takeUntilNextMatches' elts o' =
-      matchPattern' (consEType v elts subs) ps o'
-        <|> case o' of
-          (ox' : os') -> takeUntilNextMatches' (elts <> [ox']) os'
-          [] -> pure $ consEType v elts subs
+    takeUntilNextMatches' taken o' =
+      let nextPattern = matchPattern' (mempty {eType = [(v, taken)]} <> subs) ps o'
+       in nextPattern <|> case o' of
+            (ox' : os') -> takeUntilNextMatches' (taken <> [ox']) os' -- try substitution of size + 1
+            [] -> Nothing -- there is no E-Type substitution, such that the next pattern is satisfied
+
+    -- \| a special case of >1 neighboring same-identifier E-Vars.
+    -- finds a substitution that is equal for each neighboring same-identifier E-Var.
+    -- example: pattern e.x e.x e.x would match 'abcabcabc' with final substitution being (e.x, 'abc')
     repeating =
       if nNeighboring > 1
         then firstJust (map matchWithSegmentLength [0 .. (length o `div` nNeighboring)])
@@ -66,7 +74,7 @@ matchPattern' subs (px@(PVar v@(Var E _)) : ps) o =
       let (sub, restO) = splitAt (nNeighboring * seglen) o
       let seg = take seglen sub
       if isValidSub sub seglen
-        then matchPattern' (consEType v seg subs) restP restO
+        then matchPattern' (mempty {eType = [(v, seg)]} <> subs) restP restO
         else Nothing
     nNeighboring = 1 + length (takeWhile (== px) ps)
     restP = dropWhile (== px) ps

@@ -27,13 +27,13 @@ evaluate (Program p) (Opts opts) = do
 
 apply :: Function -> [ObjectExpression] -> Evaluator ObjectExpression
 apply (Builtin (HFunction f)) a = liftEither (f a)
-apply (UserDefined (RFunction ss)) a =
+apply (UserDefined (RFunction sents)) a = do
   fromMaybe
     (throwError NoMatchingPattern)
     ( firstJust
         ( map
             (\(Sentence p b) -> (`eval` b) <$> matchPattern p a)
-            ss
+            sents
         )
     )
   where
