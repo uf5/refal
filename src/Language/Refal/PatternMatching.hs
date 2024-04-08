@@ -1,34 +1,29 @@
-module Language.Refal.PatternMatching (matchPattern, Substitution) where
+module Language.Refal.PatternMatching (matchPattern, Substitutions (..)) where
 
 import Control.Applicative
-import Data.Bifunctor (second)
 import Data.List
 import Data.Semigroup (cycle1)
 import Language.Refal.Types
 
-type Substitution = (Var, ObjectExpression)
+matchPattern :: [PatternExpression] -> [ObjectExpression] -> Maybe Substitutions
+matchPattern = matchPattern' mempty
 
-matchPattern :: [PatternExpression] -> [ObjectExpression] -> Maybe [Substitution]
-matchPattern p o = flattenSubs <$> matchPattern' mempty p o
-  where
-    flattenSubs Substitution' {sType = s, tType = t, eType = e} = map (second OSym) s <> t <> map (second OSt) e
-
-data Substitution' = Substitution'
+data Substitutions = Substitutions
   { sType :: [(Var, Symbol)],
     tType :: [(Var, ObjectExpression)],
     eType :: [(Var, [ObjectExpression])]
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
-instance Semigroup Substitution' where
-  Substitution' {sType = s1, tType = t1, eType = e1}
-    <> Substitution' {sType = s2, tType = t2, eType = e2} =
-      Substitution' {sType = s1 <> s2, tType = t1 <> t2, eType = e1 <> e2}
+instance Semigroup Substitutions where
+  Substitutions {sType = s1, tType = t1, eType = e1}
+    <> Substitutions {sType = s2, tType = t2, eType = e2} =
+      Substitutions {sType = s1 <> s2, tType = t1 <> t2, eType = e1 <> e2}
 
-instance Monoid Substitution' where
-  mempty = Substitution' {sType = mempty, tType = mempty, eType = mempty}
+instance Monoid Substitutions where
+  mempty = Substitutions {sType = mempty, tType = mempty, eType = mempty}
 
-matchPattern' :: Substitution' -> [PatternExpression] -> [ObjectExpression] -> Maybe Substitution'
+matchPattern' :: Substitutions -> [PatternExpression] -> [ObjectExpression] -> Maybe Substitutions
 matchPattern' subs [] [] = pure subs
 matchPattern' subs ((PSym p) : ps) ((OSym o) : os) =
   if p == o

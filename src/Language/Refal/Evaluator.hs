@@ -39,14 +39,22 @@ apply (UserDefined (RFunction sents)) a = do
   where
     firstJust = foldl' (<|>) Nothing
 
-eval :: [Substitution] -> ResultExpression -> Evaluator ObjectExpression
+eval :: Substitutions -> ResultExpression -> Evaluator ObjectExpression
 eval _ (RSym s) = pure (OSym s)
 eval subs (RSt xs) = OSt <$> mapM (eval subs) xs
 eval subs (RCall f a) = do
   f' <- lookupFn f
   a' <- mapM (eval subs) a
   apply f' a'
-eval subs (RVar v) = maybe (throwError (VarNotDefined v)) pure (lookup v subs)
+eval subs (RVar v) = lift $ lookupVar v subs
+
+lookupVar :: Monad m => Var -> Substitutions -> ExceptT EvaluationError m ObjectExpression
+lookupVar v@(Var k _) s = maybe (throwError (VarNotDefined v)) pure (lookup v associated)
+  where
+    associated = case k of
+      S -> second OSym <$> sType s
+      T -> tType s
+      E -> second OSt <$> eType s
 
 lookupFn :: Monad m => String -> ReaderT Program' (ExceptT EvaluationError m) Function
 lookupFn name =
