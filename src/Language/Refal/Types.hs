@@ -1,6 +1,8 @@
 module Language.Refal.Types (
   EvaluationError (..),
-  VarKind (..),
+  SVar (..),
+  TVar (..),
+  EVar (..),
   Var (..),
   Symbol (..),
   PatternExpression (..),
@@ -29,14 +31,34 @@ instance Show EvaluationError where
   show NoMatchingPattern = "No matching pattern"
   show DivisionByZero = "Division by zero"
 
-data VarKind = S | T | E
-  deriving (Show, Eq)
+newtype SVar = SVar String
+  deriving (Eq)
 
-data Var = Var VarKind String
+instance Show SVar where
+  show (SVar v) = "s." <> v
+
+newtype TVar = TVar String
+  deriving (Eq)
+
+instance Show TVar where
+  show (TVar v) = "t." <> v
+
+newtype EVar = EVar String
+  deriving (Eq)
+
+instance Show EVar where
+  show (EVar v) = "e." <> v
+
+data Var
+  = SType SVar
+  | TType TVar
+  | EType EVar
   deriving (Eq)
 
 instance Show Var where
-  show (Var k v) = show k <> "." <> v
+  show (SType v) = show v
+  show (TType v) = show v
+  show (EType v) = show v
 
 data Symbol
   = Int Integer

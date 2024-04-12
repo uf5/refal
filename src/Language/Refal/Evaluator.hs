@@ -46,17 +46,17 @@ eval subs ((RCall f a) : xs) = do
   f' <- lookupFn f
   a' <- eval subs a
   (<>) <$> apply f' a' <*> eval subs xs
-eval subs@(Substitutions {sType = ss}) ((RVar v@(Var S _)) : xs) =
+eval subs@(Substitutions {sType = ss}) ((RVar w@(SType v)) : xs) =
   (:)
-    <$> maybe (throwError (VarNotDefined v)) (pure . OSym) (lookup v ss)
+    <$> maybe (throwError (VarNotDefined w)) (pure . OSym) (lookup v ss)
     <*> eval subs xs
-eval subs@(Substitutions {tType = ts}) ((RVar v@(Var T _)) : xs) =
+eval subs@(Substitutions {tType = ts}) ((RVar w@(TType v)) : xs) =
   (:)
-    <$> maybe (throwError (VarNotDefined v)) pure (lookup v ts)
+    <$> maybe (throwError (VarNotDefined w)) pure (lookup v ts)
     <*> eval subs xs
-eval subs@(Substitutions {eType = es}) ((RVar v@(Var E _)) : xs) =
+eval subs@(Substitutions {eType = es}) ((RVar w@(EType v)) : xs) =
   (<>)
-    <$> maybe (throwError (VarNotDefined v)) pure (lookup v es)
+    <$> maybe (throwError (VarNotDefined w)) pure (lookup v es)
     <*> eval subs xs
 eval _ [] = pure []
 

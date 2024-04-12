@@ -9,9 +9,9 @@ matchPattern :: [PatternExpression] -> [ObjectExpression] -> Maybe Substitutions
 matchPattern = matchPattern' mempty
 
 data Substitutions = Substitutions
-  { sType :: [(Var, Symbol)],
-    tType :: [(Var, ObjectExpression)],
-    eType :: [(Var, [ObjectExpression])]
+  { sType :: [(SVar, Symbol)],
+    tType :: [(TVar, ObjectExpression)],
+    eType :: [(EVar, [ObjectExpression])]
   }
   deriving (Show, Eq)
 
@@ -29,20 +29,22 @@ matchPattern' subs ((PSym p) : ps) ((OSym o) : os) =
   if p == o
     then matchPattern' subs ps os
     else Nothing
-matchPattern' subs ((PVar v@(Var S _)) : ps) ((OSym sx) : os) = case lookup v (sType subs) of
-  Just defined ->
-    if sx == defined
-      then matchPattern' subs ps os
-      else Nothing
-  Nothing -> matchPattern' (mempty {sType = [(v, sx)]} <> subs) ps os
-matchPattern' subs ((PVar v@(Var T _)) : ps) (ox : os) = case lookup v (tType subs) of
-  Just defined ->
-    if ox == defined
-      then matchPattern' subs ps os
-      else Nothing
-  Nothing -> matchPattern' (mempty {tType = [(v, ox)]} <> subs) ps os
-matchPattern' subs (px@(PVar v@(Var E _)) : ps) o =
-  case lookup v (eType subs) of
+matchPattern' subs@Substitutions {sType = ss} ((PVar (SType v)) : ps) ((OSym sx) : os) =
+  case lookup v ss of
+    Just defined ->
+      if sx == defined
+        then matchPattern' subs ps os
+        else Nothing
+    Nothing -> matchPattern' (mempty {sType = [(v, sx)]} <> subs) ps os
+matchPattern' subs@Substitutions {tType = ts} ((PVar (TType v)) : ps) (ox : os) =
+  case lookup v ts of
+    Just defined ->
+      if ox == defined
+        then matchPattern' subs ps os
+        else Nothing
+    Nothing -> matchPattern' (mempty {tType = [(v, ox)]} <> subs) ps os
+matchPattern' subs@Substitutions {eType = es} (px@(PVar (EType v)) : ps) o =
+  case lookup v es of
     (Just eltsDefined) ->
       let (elts, rest) = splitAt (length eltsDefined) o
        in if eltsDefined == elts
@@ -50,7 +52,7 @@ matchPattern' subs (px@(PVar v@(Var E _)) : ps) o =
             else undefined
     Nothing -> repeating <|> takeUntilNextMatches o
   where
-    -- \| find a substitutiton with the least amount of elements, so that the next pattern is statisfied.
+    -- \| find a substitution with the least amount of elements, so that the next pattern is satisfied.
     takeUntilNextMatches = takeUntilNextMatches' []
     takeUntilNextMatches' taken o' =
       let nextPattern = matchPattern' (mempty {eType = [(v, taken)]} <> subs) ps o'

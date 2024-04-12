@@ -20,13 +20,13 @@ lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
 
 pVar :: Parser T.Var
-pVar = T.Var <$> pVarKind <* char '.' <*> pIdent <?> "var"
+pVar = pVarKind <* char '.' <*> pIdent <?> "var"
   where
     pVarKind =
       choice
-        [ T.S <$ char 's',
-          T.T <$ char 't',
-          T.E <$ char 'e'
+        [ T.SType . T.SVar <$ char 's',
+          T.TType . T.TVar <$ char 't',
+          T.EType . T.EVar <$ char 'e'
         ]
         <?> "var kind"
 
