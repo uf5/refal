@@ -65,7 +65,7 @@ data ObjectExpression
   | OSt [ObjectExpression]
   deriving (Show, Eq, Ord)
 
-data Sentence = Sentence [PatternExpression] ResultExpression
+data Sentence = Sentence [PatternExpression] [ResultExpression]
   deriving (Show)
 
 newtype RFunction = RFunction [Sentence]
@@ -73,7 +73,7 @@ newtype RFunction = RFunction [Sentence]
 
 newtype HFunction
   = HFunction
-      ([ObjectExpression] -> Either EvaluationError ObjectExpression)
+      ([ObjectExpression] -> Either EvaluationError [ObjectExpression])
 
 data Function
   = UserDefined RFunction

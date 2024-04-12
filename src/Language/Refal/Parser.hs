@@ -57,7 +57,7 @@ pPattExpr = lexeme (choice [pPattSym, pPattSt, pPattVar] <?> "pattern expr")
     pPattVar = T.PVar <$> pVar
 
 pSentence :: Parser T.Sentence
-pSentence = lexeme (T.Sentence <$> (many pPattExpr <* lexeme (char '=')) <*> (pResExpr <* lexeme (char ';')) <?> "sentence")
+pSentence = lexeme (T.Sentence <$> (many pPattExpr <* lexeme (char '=')) <*> (many pResExpr <* lexeme (char ';')) <?> "sentence")
 
 pFunction :: Parser (String, T.RFunction)
 pFunction = lexeme ((,) <$> (lexeme pIdent <?> "function name") <*> ((lexeme (char '{') *> (T.RFunction <$> some pSentence) <* lexeme (char '}')) <?> "function body"))

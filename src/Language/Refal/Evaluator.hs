@@ -17,7 +17,7 @@ prelude = []
 
 newtype Opts = Opts [String]
 
-evaluate :: Program -> Opts -> Either EvaluationError ObjectExpression
+evaluate :: Program -> Opts -> Either EvaluationError [ObjectExpression]
 evaluate (Program p) (Opts opts) = do
   fnMain <- maybe (Left NoMain) (Right . UserDefined) (lookup "main" p)
   runIdentity (runExceptT (runReaderT (apply fnMain optsAsActExpr) withPrelude))
@@ -25,7 +25,7 @@ evaluate (Program p) (Opts opts) = do
     withPrelude = Program' ((second Builtin <$> prelude) <> (second UserDefined <$> p))
     optsAsActExpr = OSt . (OSym . Char <$>) <$> opts
 
-apply :: Function -> [ObjectExpression] -> Evaluator ObjectExpression
+apply :: Function -> [ObjectExpression] -> Evaluator [ObjectExpression]
 apply (Builtin (HFunction f)) a = liftEither (f a)
 apply (UserDefined (RFunction sents)) a = do
   fromMaybe
@@ -39,22 +39,26 @@ apply (UserDefined (RFunction sents)) a = do
   where
     firstJust = foldl' (<|>) Nothing
 
-eval :: Substitutions -> ResultExpression -> Evaluator ObjectExpression
-eval _ (RSym s) = pure (OSym s)
-eval subs (RSt xs) = OSt <$> mapM (eval subs) xs
-eval subs (RCall f a) = do
+eval :: Substitutions -> [ResultExpression] -> Evaluator [ObjectExpression]
+eval subs (RSym x : xs) = (OSym x :) <$> eval subs xs
+eval subs (RSt x : xs) = (:) <$> (OSt <$> eval subs x) <*> eval subs xs
+eval subs ((RCall f a) : xs) = do
   f' <- lookupFn f
-  a' <- mapM (eval subs) a
-  apply f' a'
-eval subs (RVar v) = lift $ lookupVar v subs
-
-lookupVar :: Monad m => Var -> Substitutions -> ExceptT EvaluationError m ObjectExpression
-lookupVar v@(Var k _) s = maybe (throwError (VarNotDefined v)) pure (lookup v associated)
-  where
-    associated = case k of
-      S -> second OSym <$> sType s
-      T -> tType s
-      E -> second OSt <$> eType s
+  a' <- eval subs a
+  (<>) <$> apply f' a' <*> eval subs xs
+eval subs@(Substitutions {sType = ss}) ((RVar v@(Var S _)) : xs) =
+  (:)
+    <$> maybe (throwError (VarNotDefined v)) (pure . OSym) (lookup v ss)
+    <*> eval subs xs
+eval subs@(Substitutions {tType = ts}) ((RVar v@(Var T _)) : xs) =
+  (:)
+    <$> maybe (throwError (VarNotDefined v)) pure (lookup v ts)
+    <*> eval subs xs
+eval subs@(Substitutions {eType = es}) ((RVar v@(Var E _)) : xs) =
+  (<>)
+    <$> maybe (throwError (VarNotDefined v)) pure (lookup v es)
+    <*> eval subs xs
+eval _ [] = pure []
 
 lookupFn :: Monad m => String -> ReaderT Program' (ExceptT EvaluationError m) Function
 lookupFn name =
