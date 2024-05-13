@@ -8,5 +8,10 @@ main :: IO ()
 main = do
   opts <- getArgs
   prog <- getContents
-  let prog' = parseProgram' "stdin" prog
-  either (hPutStrLn stderr) (print . (`evaluate` Opts opts)) prog'
+  either
+    (hPutStrLn stderr)
+    (print . (`evaluate` Opts opts))
+    ( do
+        parsed <- parseProgram' "stdin" prog
+        pure $ desugarProgram parsed
+    )

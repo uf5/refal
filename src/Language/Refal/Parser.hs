@@ -2,6 +2,7 @@ module Language.Refal.Parser (parseProgram, parseProgram') where
 
 import Data.Bifunctor (first)
 import Data.Void
+import Language.Refal.Sugar.Types qualified as S
 import Language.Refal.Types qualified as T
 import Text.Megaparsec
 import Text.Megaparsec.Char
@@ -19,6 +20,19 @@ sc =
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
 
+strLiteral :: Char -> Parser String
+strLiteral sur = char sur *> many ((char '\\' *> escapeSeq) <|> satisfy (/= sur)) <* char sur
+  where
+    escapeSeq :: Parser Char
+    escapeSeq =
+      choice
+        [ '\\' <$ char '\\',
+          '\'' <$ char '\'',
+          '\"' <$ char '\"',
+          '\n' <$ char 'n',
+          '\t' <$ char 't'
+        ]
+
 pVar :: Parser T.Var
 pVar = pVarKind <* char '.' <*> pIdent <?> "var"
   where
@@ -35,38 +49,45 @@ pIdent = some allowedChar <?> "identifier"
   where
     allowedChar = noneOf "\n\r\t \"()-=<>;"
 
-pSym :: Parser T.Symbol
-pSym = lexeme (choice [pInt, pChar] <?> "symbol")
+pSym :: Parser S.Symbol
+pSym = lexeme (choice [pInt, pChar, pSQStr, pDQStr] <?> "symbol")
   where
-    pInt = T.Int <$> L.decimal
-    pChar = T.Char <$> (char '\'' *> anySingle <* char '\'')
+    pInt = S.SymBasic . T.Int <$> L.decimal
+    pChar = S.SymBasic . T.Char <$> (char '\'' *> anySingle <* char '\'')
+    pSQStr = S.SymSQString <$> strLiteral '\''
+    pDQStr = S.SymDQString <$> strLiteral '"'
 
-pResExpr :: Parser T.ResultExpression
+pResExpr :: Parser S.ResultExpression
 pResExpr = lexeme (choice [pResSym, pResSt, pResCall, pResVar] <?> "result expr")
   where
-    pResSym = T.RSym <$> pSym
-    pResSt = T.RSt <$> (char '(' *> many pResExpr <* char ')')
-    pResCall = T.RCall <$> (char '<' *> lexeme pIdent) <*> many pResExpr <* char '>'
-    pResVar = T.RVar <$> pVar
+    pResSym = S.RSym <$> pSym
+    pResSt = S.RSt <$> (char '(' *> many pResExpr <* char ')')
+    pResCall = S.RCall <$> (char '<' *> lexeme pIdent) <*> many pResExpr <* char '>'
+    pResVar = S.RVar <$> pVar
 
-pPattExpr :: Parser T.PatternExpression
+pPattExpr :: Parser S.PatternExpression
 pPattExpr = lexeme (choice [pPattSym, pPattSt, pPattVar] <?> "pattern expr")
   where
-    pPattSym = T.PSym <$> pSym
-    pPattSt = T.PSt <$> (char '(' *> many pPattExpr <* char ')')
-    pPattVar = T.PVar <$> pVar
+    pPattSym = S.PSym <$> pSym
+    pPattSt = S.PSt <$> (char '(' *> many pPattExpr <* char ')')
+    pPattVar = S.PVar <$> pVar
 
-pSentence :: Parser T.Sentence
-pSentence = lexeme (T.Sentence <$> (many pPattExpr <* lexeme (char '=')) <*> (many pResExpr <* lexeme (char ';')) <?> "sentence")
+pSentence :: Parser S.Sentence
+pSentence = lexeme (S.Sentence <$> (many pPattExpr <* lexeme (char '=')) <*> (many pResExpr <* lexeme (char ';')) <?> "sentence")
 
-pFunction :: Parser (String, T.RFunction)
-pFunction = lexeme ((,) <$> (lexeme pIdent <?> "function name") <*> ((lexeme (char '{') *> (T.RFunction <$> some pSentence) <* lexeme (char '}')) <?> "function body"))
+pFunction :: Parser (String, S.Function)
+pFunction =
+  lexeme
+    ( (,)
+        <$> (lexeme pIdent <?> "function name")
+        <*> ((lexeme (char '{') *> (S.Function <$> some pSentence) <* lexeme (char '}')) <?> "function body")
+    )
 
-pProgram :: Parser T.Program
-pProgram = T.Program <$> (sc *> many pFunction)
+pProgram :: Parser S.Program
+pProgram = S.Program <$> (sc *> many pFunction)
 
-parseProgram :: String -> String -> Either (ParseErrorBundle String Void) T.Program
+parseProgram :: String -> String -> Either (ParseErrorBundle String Void) S.Program
 parseProgram = runParser (pProgram <* eof)
 
-parseProgram' :: String -> String -> Either String T.Program
+parseProgram' :: String -> String -> Either String S.Program
 parseProgram' file prog = first errorBundlePretty (parseProgram file prog)

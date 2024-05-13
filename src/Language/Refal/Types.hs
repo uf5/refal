@@ -13,7 +13,6 @@ module Language.Refal.Types (
   HFunction (..),
   Function (..),
   Program (..),
-  Program' (..),
 )
 where
 
@@ -103,5 +102,3 @@ data Function
 
 newtype Program = Program [(String, RFunction)]
   deriving (Show)
-
-newtype Program' = Program' [(String, Function)]

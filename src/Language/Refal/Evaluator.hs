@@ -10,7 +10,9 @@ import Data.Maybe (fromMaybe)
 import Language.Refal.PatternMatching
 import Language.Refal.Types
 
-type Evaluator = ReaderT Program' (ExceptT EvaluationError Identity)
+type Functions = [(String, Function)]
+
+type Evaluator = ReaderT Functions (ExceptT EvaluationError Identity)
 
 prelude :: [(String, HFunction)]
 prelude = []
@@ -22,7 +24,7 @@ evaluate (Program p) (Opts opts) = do
   fnMain <- maybe (Left NoMain) (Right . UserDefined) (lookup "main" p)
   runIdentity (runExceptT (runReaderT (apply fnMain optsAsActExpr) withPrelude))
   where
-    withPrelude = Program' ((second Builtin <$> prelude) <> (second UserDefined <$> p))
+    withPrelude = (second Builtin <$> prelude) <> (second UserDefined <$> p)
     optsAsActExpr = OSt . (OSym . Char <$>) <$> opts
 
 apply :: Function -> [ObjectExpression] -> Evaluator [ObjectExpression]
@@ -60,9 +62,7 @@ eval subs@(Substitutions {eType = es}) ((RVar w@(EType v)) : xs) =
     <*> eval subs xs
 eval _ [] = pure []
 
-lookupFn :: Monad m => String -> ReaderT Program' (ExceptT EvaluationError m) Function
+lookupFn :: Monad m => String -> ReaderT Functions (ExceptT EvaluationError m) Function
 lookupFn name =
-  reader (lookup name . unwrapProgram')
+  reader (lookup name)
     >>= maybe (throwError (FnNotDefined name)) pure
-  where
-    unwrapProgram' (Program' x) = x

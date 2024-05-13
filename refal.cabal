@@ -12,10 +12,7 @@ common shared
     -Wunused-foralls -Wunused-foralls -fprint-explicit-foralls
     -fprint-explicit-kinds
 
-  default-extensions:
-    ImportQualifiedPost
-    ImportQualifiedPost
-
+  default-extensions: ImportQualifiedPost
   build-depends:
     , base        >=4.13.0.0 && <4.18.0.0.0
     , megaparsec
@@ -31,6 +28,8 @@ library refal-lib
     Language.Refal.Evaluator
     Language.Refal.Parser
     Language.Refal.PatternMatching
+    Language.Refal.Sugar
+    Language.Refal.Sugar.Types
     Language.Refal.Types
 
 executable refal-exe
