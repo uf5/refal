@@ -28,8 +28,8 @@ library refal-lib
     Language.Refal.Evaluator
     Language.Refal.Parser
     Language.Refal.PatternMatching
-    Language.Refal.Sugar
-    Language.Refal.Sugar.Types
+    Language.Refal.Syntax
+    Language.Refal.Syntax.Types
     Language.Refal.Types
 
 executable refal-exe

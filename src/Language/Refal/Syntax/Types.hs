@@ -1,4 +1,4 @@
-module Language.Refal.Sugar.Types (
+module Language.Refal.Syntax.Types (
   Symbol (..),
   PatternExpression (..),
   ResultExpression (..),
