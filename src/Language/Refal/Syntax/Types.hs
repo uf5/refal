@@ -29,7 +29,9 @@ data ResultExpression
   | RVar T.Var
   deriving (Show)
 
-data Sentence = Sentence [PatternExpression] [ResultExpression]
+data Sentence
+  = Sentence [PatternExpression] [ResultExpression]
+  | ClauseSentence [PatternExpression] [ResultExpression] Function
   deriving (Show)
 
 newtype Function = Function [Sentence]

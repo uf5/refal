@@ -1,4 +1,4 @@
-module Language.Refal.Evaluator (evaluate, Opts (..)) where
+module Language.Refal.Evaluator (evaluate) where
 
 import Control.Applicative (Alternative (..))
 import Control.Monad.Except
@@ -17,15 +17,12 @@ type Evaluator = ReaderT Functions (ExceptT EvaluationError Identity)
 prelude :: [(String, HFunction)]
 prelude = []
 
-newtype Opts = Opts [String]
-
-evaluate :: Program -> Opts -> Either EvaluationError [ObjectExpression]
-evaluate (Program p) (Opts opts) = do
+evaluate :: Program -> [ObjectExpression] -> Either EvaluationError [ObjectExpression]
+evaluate (Program p) args = do
   fnMain <- maybe (Left NoMain) (Right . UserDefined) (lookup "main" p)
-  runIdentity (runExceptT (runReaderT (apply fnMain optsAsActExpr) withPrelude))
+  runIdentity (runExceptT (runReaderT (apply fnMain args) withPrelude))
   where
     withPrelude = (second Builtin <$> prelude) <> (second UserDefined <$> p)
-    optsAsActExpr = OSt . (OSym . Char <$>) <$> opts
 
 apply :: Function -> [ObjectExpression] -> Evaluator [ObjectExpression]
 apply (Builtin (HFunction f)) a = liftEither (f a)

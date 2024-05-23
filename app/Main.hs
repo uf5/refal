@@ -2,16 +2,27 @@ module Main where
 
 import Language.Refal
 import System.Environment (getArgs)
-import System.IO (hPutStrLn, stderr)
+import System.IO (hPrint, stderr)
 
 main :: IO ()
 main = do
-  opts <- getArgs
+  args <- getArgs
+  let args' = map fromString args
   prog <- getContents
-  either
-    (hPutStrLn stderr)
-    (print . (`evaluate` Opts opts))
-    ( do
-        parsed <- parseProgram' "stdin" prog
-        pure $ desugarProgram parsed
-    )
+  case parseProgram' "stdin" prog of
+    Left err -> hPrint stderr err
+    Right parsed -> do
+      let desugared = desugarProgram parsed
+      case evaluate desugared args' of
+        Left err -> hPrint stderr err
+        Right res -> putStrLn $ asOutput res
+  where
+    fromString = OSt . map (OSym . Char)
+    asOutput [] = ""
+    asOutput ((OSym x) : xs) =
+      ( case x of
+          (Char c) -> [c]
+          (Int i) -> show i
+      )
+        <> asOutput xs
+    asOutput ((OSt xs) : ys) = "(" <> asOutput xs <> ")" <> asOutput ys

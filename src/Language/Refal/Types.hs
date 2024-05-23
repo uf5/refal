@@ -1,4 +1,5 @@
 module Language.Refal.Types (
+  Pretty (..),
   EvaluationError (..),
   SVar (..),
   TVar (..),
@@ -16,6 +17,9 @@ module Language.Refal.Types (
 )
 where
 
+class Pretty a where
+  pretty :: a -> String
+
 data EvaluationError
   = FnNotDefined String
   | VarNotDefined Var
@@ -31,38 +35,42 @@ instance Show EvaluationError where
   show DivisionByZero = "Division by zero"
 
 newtype SVar = SVar String
-  deriving (Eq)
+  deriving (Show, Eq)
 
-instance Show SVar where
-  show (SVar v) = "s." <> v
+instance Pretty SVar where
+  pretty (SVar x) = 's' : x
 
 newtype TVar = TVar String
-  deriving (Eq)
+  deriving (Show, Eq)
 
-instance Show TVar where
-  show (TVar v) = "t." <> v
+instance Pretty TVar where
+  pretty (TVar x) = 't' : x
 
 newtype EVar = EVar String
-  deriving (Eq)
+  deriving (Show, Eq)
 
-instance Show EVar where
-  show (EVar v) = "e." <> v
+instance Pretty EVar where
+  pretty (EVar x) = 'e' : x
 
 data Var
   = SType SVar
   | TType TVar
   | EType EVar
-  deriving (Eq)
+  deriving (Show, Eq)
 
-instance Show Var where
-  show (SType v) = show v
-  show (TType v) = show v
-  show (EType v) = show v
+instance Pretty Var where
+  pretty (SType x) = pretty x
+  pretty (TType x) = pretty x
+  pretty (EType x) = pretty x
 
 data Symbol
   = Int Integer
   | Char Char
   deriving (Eq, Ord, Show)
+
+instance Pretty Symbol where
+  pretty (Int x) = show x
+  pretty (Char x) = show x
 
 -- Expressions that exist before the evaluation
 
@@ -72,12 +80,23 @@ data PatternExpression
   | PVar Var
   deriving (Eq, Show)
 
+instance Pretty PatternExpression where
+  pretty (PSym x) = pretty x
+  pretty (PSt xs) = "(" <> unwords (map pretty xs) <> ")"
+  pretty (PVar x) = pretty x
+
 data ResultExpression
   = RSym Symbol
   | RSt [ResultExpression]
   | RCall String [ResultExpression]
   | RVar Var
   deriving (Show)
+
+instance Pretty ResultExpression where
+  pretty (RSym x) = pretty x
+  pretty (RSt xs) = "(" <> unwords (map pretty xs) <> ")"
+  pretty (RCall name xs) = "<" <> name <> " " <> unwords (map pretty xs) <> ">"
+  pretty (RVar x) = pretty x
 
 -- Expression that exists during the evaluation
 
@@ -92,6 +111,9 @@ data Sentence = Sentence [PatternExpression] [ResultExpression]
 newtype RFunction = RFunction [Sentence]
   deriving (Show)
 
+instance Pretty RFunction where
+  pretty (RFunction xs) = "{\n" <> unlines (map (\(Sentence p r) -> unwords (map pretty p) <> " = " <> unwords (map pretty r)) xs) <> "}\n"
+
 newtype HFunction
   = HFunction
       ([ObjectExpression] -> Either EvaluationError [ObjectExpression])
@@ -102,3 +124,6 @@ data Function
 
 newtype Program = Program [(String, RFunction)]
   deriving (Show)
+
+instance Pretty Program where
+  pretty (Program xs) = unlines $ map (\(name, f) -> name <> " " <> pretty f) xs

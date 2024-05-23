@@ -35,7 +35,7 @@ pVar = pVarKind <*> pIdent <?> "var"
 pIdent :: Parser String
 pIdent = some allowedChar <?> "identifier"
   where
-    allowedChar = noneOf "\n\r\t \"()-=<>;"
+    allowedChar = noneOf "\n\r\t \"\'()=<>;,:"
 
 pSym :: Parser S.Symbol
 pSym = lexeme (choice [pInt, pSQStr, pDQStr] <?> "symbol")
@@ -60,15 +60,22 @@ pPattExpr = lexeme (choice [pPattSym, pPattSt, pPattVar] <?> "pattern expr")
     pPattVar = S.PVar <$> pVar
 
 pSentence :: Parser S.Sentence
-pSentence =
-  ( do
-      p <- many pPattExpr
+pSentence = do
+  p <- many pPattExpr
+  pBasic p <|> pClause p
+  where
+    pBasic p = do
       void $ lexeme (char '=')
       r <- many pResExpr
       void $ lexeme (char ';')
       pure $ S.Sentence p r
-  )
-    <?> "sentence"
+    pClause p = do
+      void $ lexeme (char ',')
+      x <- many pResExpr
+      void $ lexeme (char ':')
+      f <- pFunctionBody
+      void $ lexeme (char ';')
+      pure $ S.ClauseSentence p x f
 
 pFunctionBody :: Parser S.Function
 pFunctionBody = between (lexeme $ char '{') (lexeme $ char '}') (S.Function <$> some pSentence) <?> "function body"
