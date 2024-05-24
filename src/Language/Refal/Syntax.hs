@@ -57,19 +57,21 @@ mkEVar = mkViewFieldVar (T.EType . T.EVar)
 
 desugarProgram :: S.Program -> T.Program
 desugarProgram (S.Program prog) =
-  let (fs', DesugarState {auxFunctions = aux}) =
+  let (prog', DesugarState {auxFunctions = aux}) =
         runDesugar
-          (mapM (\(n, f) -> withNamePrefix n $ desugarFunction f) prog)
+          (mapM desugarNameFunctionPair prog)
           initialEnv
           initialState
-      prog' = zip ns fs' <> aux
-   in T.Program prog'
+   in T.Program (prog' <> aux)
   where
-    (ns, _) = unzip prog
+    desugarNameFunctionPair (n, f) = withNamePrefix n $ do
+      f' <- desugarFunction f
+      pure (n, f')
+    (functionNames, _) = unzip prog
     initialEnv =
       DesugarEnv
         { viewField = [],
-          programField = ns,
+          programField = functionNames,
           nameFn = ("aux-" <>) . show
         }
     initialState =
@@ -78,9 +80,9 @@ desugarProgram (S.Program prog) =
         }
 
 desugarFunction :: S.Function -> Desugar T.RFunction
-desugarFunction (S.Function ss) = do
-  ss' <- desugarSentences ss
-  pure $ T.RFunction ss'
+desugarFunction (S.Function sents) = do
+  sents' <- desugarSentences sents
+  pure $ T.RFunction sents'
 
 desugarSentences :: [S.Sentence] -> Desugar [T.Sentence]
 desugarSentences [] = pure []
@@ -88,28 +90,31 @@ desugarSentences ((S.Sentence p r) : rest) = do
   let p' = desugarPE p
   let r' = desugarRE r
   pPrefix <- patternPrefix
-  rest' <- desugarSentences rest
-  pure (T.Sentence (pPrefix <> p') r' : rest')
+  let sentence = T.Sentence (pPrefix <> p') r'
+  (sentence :) <$> desugarSentences rest
 desugarSentences ((S.ClauseSentence p x f) : rest) = do
   let p' = desugarPE p
   let x' = desugarRE x
-  rest' <- withNamePrefix "rest" (desugarSentences rest >>= pushNewAuxFunction . T.RFunction)
-  (f', rPrefix) <-
-    withNamePrefix
-      "clause"
-      ( withViewField patternVars $ do
-          (T.RFunction sents) <- desugarFunction f
-          rPrefix <- resultPrefix
-          argsVar <- mkEVar
-          let restSentence = T.Sentence [T.PVar argsVar] [T.RCall rest' [T.RVar argsVar]]
-          pure (map (\(T.Sentence pp rr) -> T.Sentence pp rr) sents <> [restSentence], rPrefix)
-      )
-  fName <- withNamePrefix "clause" $ pushNewAuxFunction (T.RFunction f')
-  let fCall = T.RCall fName (rPrefix <> x')
-  restArgVar <- mkEVar
-  pure [T.Sentence p' [fCall], T.Sentence [T.PVar restArgVar] [T.RCall rest' [T.RVar restArgVar]]]
+  -- Rest
+  restFnName <- withNamePrefix "rest" $ do
+    sents <- desugarSentences rest
+    pushNewAuxFunction (T.RFunction sents)
+  -- Clause
+  let patternVars = filterVars p
+  (clauseFnName, clauseCallPrefix) <- withNamePrefix "clause" $ withViewField patternVars $ do
+    clauseFnName <- do
+      (T.RFunction sents) <- desugarFunction f
+      restArgsVar <- mkEVar
+      let restCallSentence = T.Sentence [T.PVar restArgsVar] [T.RCall restFnName [T.RVar restArgsVar]]
+      let clauseFunction = T.RFunction (sents <> [restCallSentence])
+      pushNewAuxFunction clauseFunction
+    clauseCallPrefix <- resultPrefix
+    pure (clauseFnName, clauseCallPrefix)
+  let clauseCallSentence = T.Sentence p' [T.RCall clauseFnName (clauseCallPrefix <> x')]
+  restArgsVar <- mkEVar
+  let restCallSentence = T.Sentence [T.PVar restArgsVar] [T.RCall restFnName [T.RVar restArgsVar]]
+  pure [clauseCallSentence, restCallSentence]
   where
-    patternVars = filterVars p
     filterVars [] = []
     filterVars ((S.PVar v) : xs) = v : filterVars xs
     filterVars (_ : xs) = filterVars xs
