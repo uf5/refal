@@ -13,6 +13,9 @@ main = do
     Left err -> hPrint stderr err
     Right parsed -> do
       let desugared = desugarProgram parsed
+      putStrLn "DESUGARED:"
+      putStrLn $ pretty desugared
+      putStrLn "EVALUATION:"
       case evaluate desugared args' of
         Left err -> hPrint stderr err
         Right res -> putStrLn $ asOutput res

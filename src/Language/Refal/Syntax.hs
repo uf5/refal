@@ -10,12 +10,12 @@ import Language.Refal.Types qualified as T
 
 data DesugarEnv = DesugarEnv
   { viewField :: [T.Var],
+    programField :: [String],
     nameFn :: Int -> String
   }
 
-data DesugarState = DesugarState
-  { auxFunctions :: [(String, T.RFunction)],
-    programField :: [String]
+newtype DesugarState = DesugarState
+  { auxFunctions :: [(String, T.RFunction)]
   }
 
 type Desugar a = ReaderT DesugarEnv (StateT DesugarState Identity) a
@@ -37,14 +37,23 @@ resultPrefix = asks (map (T.RSt . singleton . T.RVar) . viewField)
 
 pushNewAuxFunction :: T.RFunction -> Desugar String
 pushNewAuxFunction f = do
-  n <- mkName
-  modify $ \s -> s {auxFunctions = (n, f) : auxFunctions s, programField = n : programField s}
+  n <- mkProgramFieldName
+  modify $ \s -> s {auxFunctions = (n, f) : auxFunctions s}
   pure n
-  where
-    mkName = do
-      DesugarEnv {nameFn = nf} <- ask
-      DesugarState {programField = pf} <- get
-      pure $ fromJust $ find (`notElem` pf) (map nf [1 ..])
+
+mkProgramFieldName :: Desugar String
+mkProgramFieldName = do
+  DesugarEnv {programField = pf, nameFn = nf} <- ask
+  DesugarState {auxFunctions = af} <- get
+  pure $ fromJust $ find (`notElem` (pf <> map fst af)) (map nf [1 ..])
+
+mkViewFieldVar :: (String -> T.Var) -> Desugar T.Var
+mkViewFieldVar constructor = do
+  DesugarEnv {viewField = vf} <- ask
+  pure $ fromJust $ find (`notElem` vf) (map (constructor . ("var-aux-" <>) . show) [1 :: Int ..])
+
+mkEVar :: Desugar T.Var
+mkEVar = mkViewFieldVar (T.EType . T.EVar)
 
 desugarProgram :: S.Program -> T.Program
 desugarProgram (S.Program prog) =
@@ -60,12 +69,12 @@ desugarProgram (S.Program prog) =
     initialEnv =
       DesugarEnv
         { viewField = [],
+          programField = ns,
           nameFn = ("aux-" <>) . show
         }
     initialState =
       DesugarState
-        { auxFunctions = [],
-          programField = ns
+        { auxFunctions = []
         }
 
 desugarFunction :: S.Function -> Desugar T.RFunction
@@ -84,21 +93,21 @@ desugarSentences ((S.Sentence p r) : rest) = do
 desugarSentences ((S.ClauseSentence p x f) : rest) = do
   let p' = desugarPE p
   let x' = desugarRE x
-  rest' <- withNamePrefix "rest" (desugarSentences rest) >>= pushNewAuxFunction . T.RFunction
+  rest' <- withNamePrefix "rest" (desugarSentences rest >>= pushNewAuxFunction . T.RFunction)
   (f', rPrefix) <-
     withNamePrefix
       "clause"
       ( withViewField patternVars $ do
           (T.RFunction sents) <- desugarFunction f
           rPrefix <- resultPrefix
-          vfVars <- asks viewField
-          let argsVar = fromJust $ find (`notElem` vfVars) (map (T.EType . T.EVar . ("args" <>) . show) [1 :: Int ..])
+          argsVar <- mkEVar
           let restSentence = T.Sentence [T.PVar argsVar] [T.RCall rest' [T.RVar argsVar]]
           pure (map (\(T.Sentence pp rr) -> T.Sentence pp rr) sents <> [restSentence], rPrefix)
       )
-  fName <- pushNewAuxFunction (T.RFunction f')
+  fName <- withNamePrefix "clause" $ pushNewAuxFunction (T.RFunction f')
   let fCall = T.RCall fName (rPrefix <> x')
-  pure [T.Sentence p' [fCall]]
+  restArgVar <- mkEVar
+  pure [T.Sentence p' [fCall], T.Sentence [T.PVar restArgVar] [T.RCall rest' [T.RVar restArgVar]]]
   where
     patternVars = filterVars p
     filterVars [] = []
