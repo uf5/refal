@@ -8,7 +8,7 @@ module Language.Refal.Syntax.Types (
 )
 where
 
-import Language.Refal.Types qualified as T
+import qualified Language.Refal.Types as T
 
 data Symbol
   = SymBasic T.Symbol
