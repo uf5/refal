@@ -1,6 +1,5 @@
-module Language.Refal.Types (
+module Language.Refal.BasisTypes (
   Pretty (..),
-  EvaluationError (..),
   SVar (..),
   TVar (..),
   EVar (..),
@@ -11,28 +10,12 @@ module Language.Refal.Types (
   ObjectExpression (..),
   Sentence (..),
   RFunction (..),
-  HFunction (..),
-  Function (..),
   Program (..),
 )
 where
 
 class Pretty a where
   pretty :: a -> String
-
-data EvaluationError
-  = FnNotDefined String
-  | VarNotDefined Var
-  | NoMain
-  | NoMatchingPattern
-  | DivisionByZero
-
-instance Show EvaluationError where
-  show NoMain = "Program has no `main' function"
-  show (FnNotDefined name) = "Function `" <> name <> "` is undefined"
-  show (VarNotDefined var) = "Variable `" <> show var <> "` is undefined"
-  show NoMatchingPattern = "No matching pattern"
-  show DivisionByZero = "Division by zero"
 
 newtype SVar = SVar String
   deriving (Show, Eq)
@@ -113,14 +96,6 @@ newtype RFunction = RFunction [Sentence]
 
 instance Pretty RFunction where
   pretty (RFunction xs) = "{\n" <> unlines (map (\(Sentence p r) -> unwords (map pretty p) <> " = " <> unwords (map pretty r)) xs) <> "}\n"
-
-newtype HFunction
-  = HFunction
-      ([ObjectExpression] -> Either EvaluationError [ObjectExpression])
-
-data Function
-  = UserDefined RFunction
-  | Builtin HFunction
 
 newtype Program = Program [(String, RFunction)]
   deriving (Show)

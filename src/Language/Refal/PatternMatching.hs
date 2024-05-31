@@ -1,7 +1,7 @@
 module Language.Refal.PatternMatching (matchPattern, Substitutions (..)) where
 
 import Control.Applicative
-import Language.Refal.Types
+import Language.Refal.BasisTypes
 
 matchPattern :: [PatternExpression] -> [ObjectExpression] -> Maybe Substitutions
 matchPattern = matchPattern' mempty

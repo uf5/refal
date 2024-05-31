@@ -1,4 +1,4 @@
-module Language.Refal.Syntax.Types (
+module Language.Refal.ExtendedTypes (
   Symbol (..),
   PatternExpression (..),
   ResultExpression (..),
@@ -8,7 +8,7 @@ module Language.Refal.Syntax.Types (
 )
 where
 
-import qualified Language.Refal.Types as T
+import qualified Language.Refal.BasisTypes as T
 
 data Symbol
   = SymBasic T.Symbol

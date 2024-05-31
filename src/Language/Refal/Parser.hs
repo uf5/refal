@@ -3,8 +3,8 @@ module Language.Refal.Parser (parseProgram, parseProgram') where
 import Control.Monad (void)
 import Data.Bifunctor (first)
 import Data.Void
-import qualified Language.Refal.Syntax.Types as S
-import qualified Language.Refal.Types as T
+import qualified Language.Refal.BasisTypes as T
+import qualified Language.Refal.ExtendedTypes as S
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L

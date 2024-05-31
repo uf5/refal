@@ -24,12 +24,12 @@ library refal-lib
   hs-source-dirs:  src
   exposed-modules: Language.Refal
   other-modules:
+    Language.Refal.BasisTypes
     Language.Refal.Evaluator
+    Language.Refal.ExtendedTypes
     Language.Refal.Parser
     Language.Refal.PatternMatching
     Language.Refal.Syntax
-    Language.Refal.Syntax.Types
-    Language.Refal.Types
 
 executable refal-exe
   import:         shared

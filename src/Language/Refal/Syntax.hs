@@ -5,8 +5,8 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.List (find, singleton)
 import Data.Maybe (fromJust)
-import qualified Language.Refal.Syntax.Types as S
-import qualified Language.Refal.Types as T
+import qualified Language.Refal.BasisTypes as T
+import qualified Language.Refal.ExtendedTypes as S
 
 data DesugarEnv = DesugarEnv
   { viewField :: [T.Var],

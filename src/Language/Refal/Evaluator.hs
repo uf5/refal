@@ -1,65 +1,95 @@
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
+
 module Language.Refal.Evaluator (evaluate) where
 
-import Control.Applicative (Alternative (..))
 import Control.Monad.Except
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Data.Bifunctor (second)
-import Data.List (foldl')
 import Data.Maybe (fromMaybe)
+import Language.Refal.BasisTypes
 import Language.Refal.PatternMatching
-import Language.Refal.Types
+
+data EvaluationError
+  = FnNotDefined String
+  | VarNotDefined Var
+  | NoMatchingPattern
+  | DivisionByZero
+  deriving (Show)
+
+newtype HFunction
+  = HFunction
+      ([ObjectExpression] -> Either EvaluationError [ObjectExpression])
+
+data Function
+  = UserDefined RFunction
+  | Builtin HFunction
 
 type Functions = [(String, Function)]
 
-type Evaluator = ReaderT Functions (ExceptT EvaluationError Identity)
+type ProgramField m a = ReaderT Functions m a
+
+type ViewField m a = ReaderT Substitutions m a
+
+newtype Evaluator a = Evaluator (ProgramField (ExceptT EvaluationError Identity) a)
+  deriving (Functor, Applicative, Monad, MonadReader Functions, MonadError EvaluationError)
+
+runEvaluator :: Evaluator a -> Functions -> Either EvaluationError a
+runEvaluator (Evaluator m) fs = runIdentity (runExceptT (runReaderT m fs))
+
+getFn :: String -> Evaluator Function
+getFn name = do
+  fn <- reader (lookup name)
+  case fn of
+    Just fn' -> pure fn'
+    Nothing -> throwError (FnNotDefined name)
 
 prelude :: [(String, HFunction)]
 prelude = []
 
 evaluate :: Program -> [ObjectExpression] -> Either EvaluationError [ObjectExpression]
-evaluate (Program p) args = do
-  fnMain <- maybe (Left NoMain) (Right . UserDefined) (lookup "main" p)
-  runIdentity (runExceptT (runReaderT (apply fnMain args) withPrelude))
+evaluate (Program p) args =
+  runEvaluator
+    ( do
+        mainFn <- getFn "main"
+        apply mainFn args
+    )
+    withPrelude
   where
     withPrelude = (second Builtin <$> prelude) <> (second UserDefined <$> p)
 
 apply :: Function -> [ObjectExpression] -> Evaluator [ObjectExpression]
 apply (Builtin (HFunction f)) a = liftEither (f a)
-apply (UserDefined (RFunction sents)) a = do
+apply (UserDefined (RFunction sents)) a =
   fromMaybe
     (throwError NoMatchingPattern)
-    ( firstJust
-        ( map
-            (\(Sentence p b) -> (`eval` b) <$> matchPattern p a)
-            sents
-        )
-    )
+    (firstJust (map evalSentence sents))
   where
-    firstJust = foldl' (<|>) Nothing
+    firstJust [] = Nothing
+    firstJust ((Just x) : _) = pure x
+    firstJust (Nothing : xs) = firstJust xs
+    evalSentence (Sentence p r) = runReaderT (eval r) <$> matchPattern p a
 
-eval :: Substitutions -> [ResultExpression] -> Evaluator [ObjectExpression]
-eval subs (RSym x : xs) = (OSym x :) <$> eval subs xs
-eval subs (RSt x : xs) = (:) <$> (OSt <$> eval subs x) <*> eval subs xs
-eval subs ((RCall f a) : xs) = do
-  f' <- lookupFn f
-  a' <- eval subs a
-  (<>) <$> apply f' a' <*> eval subs xs
-eval subs@(Substitutions {sType = ss}) ((RVar w@(SType v)) : xs) =
-  (:)
-    <$> maybe (throwError (VarNotDefined w)) (pure . OSym) (lookup v ss)
-    <*> eval subs xs
-eval subs@(Substitutions {tType = ts}) ((RVar w@(TType v)) : xs) =
-  (:)
-    <$> maybe (throwError (VarNotDefined w)) pure (lookup v ts)
-    <*> eval subs xs
-eval subs@(Substitutions {eType = es}) ((RVar w@(EType v)) : xs) =
-  (<>)
-    <$> maybe (throwError (VarNotDefined w)) pure (lookup v es)
-    <*> eval subs xs
-eval _ [] = pure []
-
-lookupFn :: Monad m => String -> ReaderT Functions (ExceptT EvaluationError m) Function
-lookupFn name =
-  reader (lookup name)
-    >>= maybe (throwError (FnNotDefined name)) pure
+eval :: [ResultExpression] -> ViewField Evaluator [ObjectExpression]
+eval [] = pure []
+eval (RSym x : xs) = (OSym x :) <$> eval xs
+eval (RSt x : xs) = (:) <$> (OSt <$> eval x) <*> eval xs
+eval ((RCall f a) : xs) = do
+  f' <- lift $ getFn f
+  a' <- eval a
+  (<>) <$> lift (apply f' a') <*> eval xs
+eval ((RVar n@(SType v)) : xs) = do
+  v' <- reader (lookup v . sType)
+  case v' of
+    Just x -> (OSym x :) <$> eval xs
+    Nothing -> throwError (VarNotDefined n)
+eval ((RVar n@(TType v)) : xs) = do
+  v' <- reader (lookup v . tType)
+  case v' of
+    Just x -> (x :) <$> eval xs
+    Nothing -> throwError (VarNotDefined n)
+eval ((RVar n@(EType v)) : xs) = do
+  v' <- reader (lookup v . eType)
+  case v' of
+    Just x -> (x <>) <$> eval xs
+    Nothing -> throwError (VarNotDefined n)
