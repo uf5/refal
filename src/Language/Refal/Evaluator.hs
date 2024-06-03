@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Language.Refal.Evaluator (evaluate) where
 
@@ -6,6 +7,8 @@ import Control.Monad.Except
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Data.Bifunctor (second)
+import qualified Data.Char as Char
+import qualified Data.List as List
 import Data.Maybe (fromMaybe)
 import Language.Refal.BasisTypes
 import Language.Refal.PatternMatching
@@ -44,8 +47,52 @@ getFn name = do
     Just fn' -> pure fn'
     Nothing -> throwError (FnNotDefined name)
 
-prelude :: [(String, HFunction)]
-prelude = []
+stdFns :: [(String, HFunction)]
+stdFns =
+  [ -- arithmetic
+    ("Add!", intBinOp (+)),
+    ("Sub!", intBinOp (-)),
+    ("Mul!", intBinOp (*)),
+    ("Div!", intBinOpDiv div),
+    ("Mod!", intBinOpDiv mod),
+    ("Compare", intCompare),
+    -- char
+    ("Int2Char!", int2char),
+    ("Char2Int!", char2int),
+    ("Upper!", charUpper),
+    -- type
+    ("Type!", getType)
+  ]
+  where
+    intBinOp op = HFunction $ \case
+      [OSym (Int m), OSym (Int n)] -> pure [OSym (Int (m `op` n))]
+      _ -> Left NoMatchingPattern
+    intBinOpDiv op = HFunction $ \case
+      [OSym (Int m), OSym (Int 0)] -> Left DivisionByZero
+      [OSym (Int m), OSym (Int n)] -> pure [OSym (Int (m `op` n))]
+      _ -> Left NoMatchingPattern
+    intCompare = HFunction $ \args ->
+      List.singleton . OSym . Char <$> case args of
+        [OSym (Int m), OSym (Int n)]
+          | m > n -> pure '+'
+          | m < n -> pure '-'
+          | otherwise -> pure '0'
+        _ -> Left NoMatchingPattern
+    int2char = HFunction $ \case
+      [OSym (Int m)] -> pure [OSym (Char (Char.chr m))]
+      _ -> Left NoMatchingPattern
+    char2int = HFunction $ \case
+      [OSym (Char m)] -> pure [OSym (Int (Char.ord m))]
+      _ -> Left NoMatchingPattern
+    charUpper = HFunction $ \case
+      [OSym (Char m)] -> pure [OSym (Char (Char.toUpper m))]
+      _ -> Left NoMatchingPattern
+    getType = HFunction $ \args ->
+      pure $ List.singleton $ OSym $ Char $ case args of
+        [OSym (Int _)] -> 'N'
+        [OSym (Char _)] -> 'L'
+        [OSt _] -> 'S'
+        _ -> 'O'
 
 evaluate :: Program -> [ObjectExpression] -> Either EvaluationError [ObjectExpression]
 evaluate (Program p) args =
@@ -54,9 +101,9 @@ evaluate (Program p) args =
         mainFn <- getFn "main"
         apply mainFn args
     )
-    withPrelude
+    withStdFns
   where
-    withPrelude = (second Builtin <$> prelude) <> (second UserDefined <$> p)
+    withStdFns = (second Builtin <$> stdFns) <> (second UserDefined <$> p)
 
 apply :: Function -> [ObjectExpression] -> Evaluator [ObjectExpression]
 apply (Builtin (HFunction f)) a = liftEither (f a)

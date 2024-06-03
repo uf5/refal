@@ -47,7 +47,7 @@ instance Pretty Var where
   pretty (EType x) = pretty x
 
 data Symbol
-  = Int Integer
+  = Int Int
   | Char Char
   deriving (Eq, Ord, Show)
 

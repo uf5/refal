@@ -1,6 +1,6 @@
 module Language.Refal.PatternMatching (matchPattern, Substitutions (..)) where
 
-import Control.Applicative
+import Control.Applicative.Combinators
 import Language.Refal.BasisTypes
 
 matchPattern :: [PatternExpression] -> [ObjectExpression] -> Maybe Substitutions
@@ -41,15 +41,13 @@ matchPattern' subs@Substitutions {tType = ts} ((PVar (TType v)) : ps) (ox : os) 
 matchPattern' subs@Substitutions {eType = es} ((PVar (EType v)) : ps) o =
   case lookup v es of
     Just defined
-      | let (elts, rest) = splitAt (length defined) o, elts == defined -> matchPattern' subs ps rest
+      | let (elts, rest) = splitAt (length defined) o,
+        elts == defined ->
+          matchPattern' subs ps rest
       | otherwise -> Nothing
-    Nothing -> takeUntilNextMatches [] o
+    Nothing -> choice $ map (foo . (`splitAt` o)) [0 .. length o]
   where
-    takeUntilNextMatches taken o' =
-      matchPattern' (mempty {eType = [(v, taken)]} <> subs) ps o'
-        <|> case o' of
-          (ox' : os') -> takeUntilNextMatches (taken <> [ox']) os'
-          [] -> Nothing
+    foo (elts, rest) = matchPattern' (mempty {eType = [(v, elts)]} <> subs) ps rest
 matchPattern' subs ((PSt p) : ps) ((OSt o) : os) = do
   subs' <- matchPattern' subs p o
   matchPattern' subs' ps os
