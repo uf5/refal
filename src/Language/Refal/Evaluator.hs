@@ -19,12 +19,13 @@ data EvaluationError
   | NoMatchingPattern
   | DivisionByZero
   | BadArgument
+  | NotAValidFunctionName
   | Info String EvaluationError
   deriving (Show)
 
 newtype HFunction
   = HFunction
-      ([ObjectExpression] -> Either EvaluationError [ObjectExpression])
+      ([ObjectExpression] -> Evaluator [ObjectExpression])
 
 data Function
   = UserDefined RFunction
@@ -64,54 +65,71 @@ stdFns =
     ("Upper", charUpper),
     ("Lower", charLower),
     -- type
-    ("Type", getType)
+    ("Type", getType),
+    -- Mu
+    ("Mu", mu)
   ]
   where
-    -- arithmetic
     intBinOp op = HFunction $ \case
       [OSym (Int m), OSym (Int n)] -> pure [symInt (m `op` n)]
-      _ -> Left NoMatchingPattern
+      _ -> throwError NoMatchingPattern
+
     intBinOpDiv op = HFunction $ \case
-      [OSym (Int _), OSym (Int 0)] -> Left DivisionByZero
+      [OSym (Int _), OSym (Int 0)] -> throwError DivisionByZero
       [OSym (Int m), OSym (Int n)] -> pure [symInt (m `op` n)]
-      _ -> Left NoMatchingPattern
+      _ -> throwError NoMatchingPattern
+
     intCompare = HFunction $ \args ->
       List.singleton . OSym . Char <$> case args of
         [OSym (Int m), OSym (Int n)]
           | m > n -> pure '+'
           | m < n -> pure '-'
           | otherwise -> pure '0'
-        _ -> Left NoMatchingPattern
-    -- conversion
+        _ -> throwError NoMatchingPattern
+
     int2char = HFunction $ \case
       [OSym (Int m)] ->
         maybe
-          (Left BadArgument)
+          (throwError BadArgument)
           (pure . List.singleton . symChar)
           (safeChr m)
-      _ -> Left NoMatchingPattern
+      _ -> throwError NoMatchingPattern
+
     char2int = HFunction $ \case
       [OSym (Char m)] -> pure [symInt $ toInteger $ Char.ord m]
-      _ -> Left NoMatchingPattern
-    -- char
+      _ -> throwError NoMatchingPattern
+
     charUpper = HFunction $ \case
       [OSym (Char m)] -> pure [symChar $ Char.toUpper m]
-      _ -> Left NoMatchingPattern
+      _ -> throwError NoMatchingPattern
+
     charLower = HFunction $ \case
       [OSym (Char m)] -> pure [symChar $ Char.toLower m]
-      _ -> Left NoMatchingPattern
-    -- type
+      _ -> throwError NoMatchingPattern
+
     getType = HFunction $ \case
       [] -> pure $ List.singleton $ symChar '*'
       (x : xs) -> pure $ symChar (getType' x) : xs
     getType' (OSym (Int _)) = 'D'
     getType' (OSym (Char _)) = 'L'
     getType' (OSt _) = 'S'
-    -- utility
+
+    mu = HFunction $ \case
+      ((OSt fname) : args) -> do
+        fname' <- maybe (throwError NotAValidFunctionName) pure (asStr fname)
+        f <- getFn fname'
+        withError (Info fname') (apply f args)
+      _ -> throwError NoMatchingPattern
+
     safeChr m
       | (toInteger (Char.ord minBound) <= m) && m <= toInteger (Char.ord maxBound) =
           pure (Char.chr (fromInteger m))
       | otherwise = Nothing
+
+    asStr [] = pure []
+    asStr (OSym (Char x) : xs) = (x :) <$> asStr xs
+    asStr _ = Nothing
+
     symChar = OSym . Char
     symInt = OSym . Int
 
@@ -127,7 +145,7 @@ evaluate (Program p) args =
     withStdFns = (second Builtin <$> stdFns) <> (second UserDefined <$> p)
 
 apply :: Function -> [ObjectExpression] -> Evaluator [ObjectExpression]
-apply (Builtin (HFunction f)) a = liftEither (f a)
+apply (Builtin (HFunction f)) a = f a
 apply (UserDefined (RFunction sents)) a =
   fromMaybe
     (throwError NoMatchingPattern)
