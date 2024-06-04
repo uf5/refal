@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 
-module Language.Refal.Evaluator (evaluate) where
+module Language.Refal.Evaluator (evaluate, EvaluationError (..)) where
 
 import Control.Monad.Except
 import Control.Monad.Identity
@@ -19,6 +19,7 @@ data EvaluationError
   | NoMatchingPattern
   | DivisionByZero
   | BadArgument
+  | Info String EvaluationError
   deriving (Show)
 
 newtype HFunction
@@ -133,7 +134,7 @@ apply (UserDefined (RFunction sents)) a =
     (firstJust (map evalSentence sents))
   where
     firstJust [] = Nothing
-    firstJust ((Just x) : _) = pure x
+    firstJust (x@(Just _) : _) = x
     firstJust (Nothing : xs) = firstJust xs
     evalSentence (Sentence p r) = runReaderT (eval r) <$> matchPattern p a
 
@@ -144,7 +145,8 @@ eval (RSt x : xs) = (:) <$> (OSt <$> eval x) <*> eval xs
 eval ((RCall f a) : xs) = do
   f' <- lift $ getFn f
   a' <- eval a
-  (<>) <$> lift (apply f' a') <*> eval xs
+  r <- lift $ withError (Info f) (apply f' a')
+  (r <>) <$> eval xs
 eval ((RVar n@(SType v)) : xs) = do
   v' <- reader (lookup v . sType)
   case v' of
