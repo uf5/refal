@@ -47,7 +47,7 @@ instance Pretty Var where
   pretty (EType x) = pretty x
 
 data Symbol
-  = Int Int
+  = Int Integer
   | Char Char
   deriving (Eq, Ord, Show)
 
@@ -95,7 +95,7 @@ newtype RFunction = RFunction [Sentence]
   deriving (Show)
 
 instance Pretty RFunction where
-  pretty (RFunction xs) = "{\n" <> unlines (map (\(Sentence p r) -> unwords (map pretty p) <> " = " <> unwords (map pretty r)) xs) <> "}\n"
+  pretty (RFunction xs) = "{\n" <> unlines (map (\(Sentence p r) -> unwords (map pretty p) <> " = " <> unwords (map ((<> ";") . pretty) r)) xs) <> "}\n"
 
 newtype Program = Program [(String, RFunction)]
   deriving (Show)

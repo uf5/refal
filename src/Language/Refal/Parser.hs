@@ -2,6 +2,7 @@ module Language.Refal.Parser (parseProgram, parseProgram') where
 
 import Control.Monad (void)
 import Data.Bifunctor (first)
+import Data.Function
 import Data.Void
 import qualified Language.Refal.BasisTypes as T
 import qualified Language.Refal.ExtendedTypes as S
@@ -32,6 +33,9 @@ pVar = pVarKind <*> pIdent <?> "var"
         ]
         <?> "var kind"
 
+betweenLexeme :: Parser sur -> Parser sur -> Parser inner -> Parser inner
+betweenLexeme = between `on` lexeme
+
 pIdent :: Parser String
 pIdent = some allowedChar <?> "identifier"
   where
@@ -48,15 +52,15 @@ pResExpr :: Parser S.ResultExpression
 pResExpr = lexeme (choice [pResSym, pResSt, pResCall, pResVar] <?> "result expr")
   where
     pResSym = S.RSym <$> pSym
-    pResSt = between (char '(') (char ')') (S.RSt <$> many pResExpr)
-    pResCall = between (char '<') (char '>') (S.RCall <$> lexeme pIdent <*> many pResExpr)
+    pResSt = betweenLexeme (char '(') (char ')') (S.RSt <$> many pResExpr)
+    pResCall = betweenLexeme (char '<') (char '>') (S.RCall <$> lexeme pIdent <*> many pResExpr)
     pResVar = S.RVar <$> pVar
 
 pPattExpr :: Parser S.PatternExpression
 pPattExpr = lexeme (choice [pPattSym, pPattSt, pPattVar] <?> "pattern expr")
   where
     pPattSym = S.PSym <$> pSym
-    pPattSt = S.PSt <$> between (char '(') (char ')') (many pPattExpr)
+    pPattSt = S.PSt <$> betweenLexeme (char '(') (char ')') (many pPattExpr)
     pPattVar = S.PVar <$> pVar
 
 pSentence :: Parser S.Sentence
@@ -78,7 +82,7 @@ pSentence = do
       pure $ S.ClauseSentence p x f
 
 pFunctionBody :: Parser S.Function
-pFunctionBody = between (lexeme $ char '{') (lexeme $ char '}') (S.Function <$> some pSentence) <?> "function body"
+pFunctionBody = betweenLexeme (char '{') (char '}') (S.Function <$> some pSentence) <?> "function body"
 
 pFunction :: Parser (String, S.Function)
 pFunction = (,) <$> pFunctionName <*> pFunctionBody

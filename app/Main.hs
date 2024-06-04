@@ -2,7 +2,7 @@ module Main where
 
 import Language.Refal
 import System.Environment (getArgs)
-import System.IO (hPrint, stderr)
+import System.IO (hPrint, hPutStrLn, stderr)
 
 main :: IO ()
 main = do
@@ -10,7 +10,7 @@ main = do
   let args' = map fromString args
   prog <- getContents
   case parseProgram' "stdin" prog of
-    Left err -> hPrint stderr err
+    Left err -> hPutStrLn stderr err
     Right parsed -> do
       let desugared = desugarProgram parsed
       putStrLn "DESUGARED:"
