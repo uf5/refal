@@ -4,7 +4,6 @@
 module Language.Refal.Evaluator (evaluate, EvaluationError (..)) where
 
 import Control.Monad.Except
-import Control.Monad.Identity
 import Control.Monad.Reader
 import Data.Bifunctor (second)
 import qualified Data.Char as Char
@@ -37,11 +36,11 @@ type ProgramField m a = ReaderT Functions m a
 
 type ViewField m a = ReaderT Substitutions m a
 
-newtype Evaluator a = Evaluator (ProgramField (ExceptT EvaluationError Identity) a)
-  deriving (Functor, Applicative, Monad, MonadReader Functions, MonadError EvaluationError)
+newtype Evaluator a = Evaluator (ProgramField (ExceptT EvaluationError IO) a)
+  deriving (Functor, Applicative, Monad, MonadReader Functions, MonadError EvaluationError, MonadIO)
 
-runEvaluator :: Evaluator a -> Functions -> Either EvaluationError a
-runEvaluator (Evaluator m) fs = runIdentity (runExceptT (runReaderT m fs))
+runEvaluator :: Evaluator a -> Functions -> IO (Either EvaluationError a)
+runEvaluator (Evaluator m) fs = runExceptT (runReaderT m fs)
 
 getFn :: String -> Evaluator Function
 getFn name = do
@@ -67,7 +66,10 @@ stdFns =
     -- type
     ("Type", getType),
     -- Mu
-    ("Mu", mu)
+    ("Mu", mu),
+    -- IO
+    ("Print", refalPrint),
+    ("Prout", refalProut)
   ]
   where
     intBinOp op = HFunction $ \case
@@ -121,6 +123,10 @@ stdFns =
         withError (Info fname') (apply f args)
       _ -> throwError NoMatchingPattern
 
+    refalPrint = HFunction $ \args -> args <$ liftIO (putStrLn (showOutput args))
+
+    refalProut = HFunction $ \args -> [] <$ liftIO (putStrLn (showOutput args))
+
     safeChr m
       | (toInteger (Char.ord minBound) <= m) && m <= toInteger (Char.ord maxBound) =
           pure (Char.chr (fromInteger m))
@@ -133,7 +139,7 @@ stdFns =
     symChar = OSym . Char
     symInt = OSym . Int
 
-evaluate :: Program -> [ObjectExpression] -> Either EvaluationError [ObjectExpression]
+evaluate :: Program -> [ObjectExpression] -> IO (Either EvaluationError [ObjectExpression])
 evaluate (Program p) args =
   runEvaluator
     ( do

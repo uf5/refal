@@ -11,8 +11,19 @@ module Language.Refal.BasisTypes (
   Sentence (..),
   RFunction (..),
   Program (..),
+  showOutput,
 )
 where
+
+showOutput :: [ObjectExpression] -> String
+showOutput [] = ""
+showOutput ((OSym x) : xs) =
+  ( case x of
+      (Char c) -> [c]
+      (Int i) -> show i
+  )
+    <> showOutput xs
+showOutput ((OSt xs) : ys) = "(" <> showOutput xs <> ")" <> showOutput ys
 
 class Pretty a where
   pretty :: a -> String
