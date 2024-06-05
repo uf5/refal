@@ -5,6 +5,7 @@ module Language.Refal.Evaluator (evaluate, EvaluationError (..)) where
 
 import Control.Monad.Except
 import Control.Monad.Reader
+import Control.Monad.State
 import Data.Bifunctor (second)
 import qualified Data.Char as Char
 import qualified Data.List as List
@@ -32,15 +33,52 @@ data Function
 
 type Functions = [(String, Function)]
 
-type ProgramField m a = ReaderT Functions m a
+type ProgramField m = ReaderT Functions m
 
-type ViewField m a = ReaderT Substitutions m a
+type ViewField m = ReaderT Substitutions m
 
-newtype Evaluator a = Evaluator (ProgramField (ExceptT EvaluationError IO) a)
-  deriving (Functor, Applicative, Monad, MonadReader Functions, MonadError EvaluationError, MonadIO)
+newtype BuryDigState = BuryDigState
+  { buried :: [([ObjectExpression], [ObjectExpression])]
+  }
+  deriving (Semigroup, Monoid)
 
-runEvaluator :: Evaluator a -> Functions -> IO (Either EvaluationError a)
-runEvaluator (Evaluator m) fs = runExceptT (runReaderT m fs)
+type BuryDig m = StateT BuryDigState m
+
+newtype Evaluator a = Evaluator (ProgramField (BuryDig (ExceptT EvaluationError IO)) a)
+  deriving (Functor, Applicative, Monad, MonadReader Functions, MonadState BuryDigState, MonadError EvaluationError, MonadIO)
+
+runEvaluator :: Evaluator a -> Functions -> BuryDigState -> IO (Either EvaluationError a)
+runEvaluator (Evaluator m) fs bs = runExceptT (evalStateT (runReaderT m fs) bs)
+
+stackBury :: [ObjectExpression] -> [ObjectExpression] -> Evaluator ()
+stackBury n x = modify (\s -> s {buried = (n, x) : buried s})
+
+stackDig :: [ObjectExpression] -> Evaluator [ObjectExpression]
+stackDig n = do
+  br <- gets buried
+  case (`splitAt` br) <$> List.elemIndex n (map fst br) of
+    (Just (ysl, x : ysr)) -> do
+      modify (\s -> s {buried = ysl <> ysr})
+      pure (snd x)
+    (Just (_, [])) -> error "not possible"
+    Nothing -> pure []
+
+stackCp :: [ObjectExpression] -> Evaluator [ObjectExpression]
+stackCp n = do
+  p <- gets (lookup n . buried)
+  pure $ case p of
+    (Just x) -> x
+    Nothing -> []
+
+stackRp :: [ObjectExpression] -> [ObjectExpression] -> Evaluator ()
+stackRp n x = do
+  br <- gets buried
+  case (`splitAt` br) <$> List.elemIndex n (map fst br) of
+    (Just (ysl, _ : ysr)) -> do
+      modify (\s -> s {buried = ysl <> ((n, x) : ysr)})
+      pure ()
+    (Just (_, [])) -> error "not possible"
+    Nothing -> pure ()
 
 getFn :: String -> Evaluator Function
 getFn name = do
@@ -69,7 +107,12 @@ stdFns =
     ("Mu", mu),
     -- IO
     ("Print", refalPrint),
-    ("Prout", refalProut)
+    ("Prout", refalProut),
+    -- Bury/dig
+    ("Br", refalBury),
+    ("Dg", refalDig),
+    ("Cp", refalCp),
+    ("Rp", refalRp)
   ]
   where
     intBinOp op = HFunction $ \case
@@ -127,6 +170,18 @@ stdFns =
 
     refalProut = HFunction $ \args -> [] <$ liftIO (putStrLn (showOutput args))
 
+    refalBury = HFunction $ \case
+      (OSt n : x) -> [] <$ stackBury n x
+      _ -> throwError NoMatchingPattern
+
+    refalDig = HFunction stackDig
+
+    refalCp = HFunction stackCp
+
+    refalRp = HFunction $ \case
+      (OSt n : x) -> [] <$ stackRp n x
+      _ -> throwError NoMatchingPattern
+
     safeChr m
       | (toInteger (Char.ord minBound) <= m) && m <= toInteger (Char.ord maxBound) =
           pure (Char.chr (fromInteger m))
@@ -147,8 +202,9 @@ evaluate (Program p) args =
         apply mainFn args
     )
     withStdFns
+    mempty
   where
-    withStdFns = (second Builtin <$> stdFns) <> (second UserDefined <$> p)
+    withStdFns = (second UserDefined <$> p) <> (second Builtin <$> stdFns)
 
 apply :: Function -> [ObjectExpression] -> Evaluator [ObjectExpression]
 apply (Builtin (HFunction f)) a = f a

@@ -16,7 +16,7 @@ sc :: Parser ()
 sc =
   L.space
     space1
-    empty
+    (L.skipLineComment "*")
     (L.skipBlockComment "/*" "*/")
 
 lexeme :: Parser a -> Parser a
