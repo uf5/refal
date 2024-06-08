@@ -96,11 +96,12 @@ stdFns =
     ("Div", intBinOpDiv div),
     ("Mod", intBinOpDiv mod),
     ("Compare", intCompare),
-    -- char
+    -- Manip
     ("Symb", int2char),
     ("Numb", char2int),
     ("Upper", charUpper),
     ("Lower", charLower),
+    ("Lenw", lenw),
     -- type
     ("Type", getType),
     -- Mu
@@ -151,6 +152,8 @@ stdFns =
     charLower = HFunction $ \case
       [OSym (Char m)] -> pure [symChar $ Char.toLower m]
       _ -> throwError NoMatchingPattern
+
+    lenw = HFunction $ pure . List.singleton . symInt . toInteger . length
 
     getType = HFunction $ \case
       [] -> pure $ List.singleton $ symChar '*'
