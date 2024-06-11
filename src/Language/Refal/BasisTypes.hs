@@ -21,6 +21,7 @@ showOutput ((OSym x) : xs) =
   ( case x of
       (Char c) -> [c]
       (Int i) -> show i
+      (Identifier i) -> i
   )
     <> showOutput xs
 showOutput ((OSt xs) : ys) = "(" <> showOutput xs <> ")" <> showOutput ys
@@ -60,11 +61,13 @@ instance Pretty Var where
 data Symbol
   = Int Integer
   | Char Char
+  | Identifier String
   deriving (Eq, Ord, Show)
 
 instance Pretty Symbol where
   pretty (Int x) = show x
   pretty (Char x) = show x
+  pretty (Identifier x) = x
 
 -- Expressions that exist before the evaluation
 

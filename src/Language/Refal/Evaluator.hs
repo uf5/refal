@@ -44,8 +44,26 @@ newtype BuryDigState = BuryDigState
 
 type BuryDig m = StateT BuryDigState m
 
-newtype Evaluator a = Evaluator (ProgramField (BuryDig (ExceptT EvaluationError IO)) a)
-  deriving (Functor, Applicative, Monad, MonadReader Functions, MonadState BuryDigState, MonadError EvaluationError, MonadIO)
+newtype Evaluator a
+  = Evaluator
+      ( ProgramField
+          ( BuryDig
+              ( ExceptT
+                  EvaluationError
+                  IO
+              )
+          )
+          a
+      )
+  deriving
+    ( Functor,
+      Applicative,
+      Monad,
+      MonadReader Functions,
+      MonadState BuryDigState,
+      MonadError EvaluationError,
+      MonadIO
+    )
 
 runEvaluator :: Evaluator a -> Functions -> BuryDigState -> IO (Either EvaluationError a)
 runEvaluator (Evaluator m) fs bs = runExceptT (evalStateT (runReaderT m fs) bs)
@@ -160,6 +178,7 @@ stdFns =
       (x : xs) -> pure $ symChar (getType' x) : xs
     getType' (OSym (Int _)) = 'D'
     getType' (OSym (Char _)) = 'L'
+    getType' (OSym (Identifier _)) = 'I'
     getType' (OSt _) = 'S'
 
     mu = HFunction $ \case
@@ -201,7 +220,7 @@ evaluate :: Program -> [ObjectExpression] -> IO (Either EvaluationError [ObjectE
 evaluate (Program p) args =
   runEvaluator
     ( do
-        mainFn <- getFn "main"
+        mainFn <- getFn "Main"
         apply mainFn args
     )
     withStdFns

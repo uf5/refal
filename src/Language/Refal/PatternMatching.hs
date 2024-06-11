@@ -45,9 +45,9 @@ matchPattern' subs@Substitutions {eType = es} ((PVar (EType v)) : ps) o =
         elts == defined ->
           matchPattern' subs ps rest
       | otherwise -> Nothing
-    Nothing -> choice $ map (foo . (`splitAt` o)) [0 .. length o]
+    Nothing -> choice $ map (withEVar . (`splitAt` o)) [0 .. length o]
   where
-    foo (elts, rest) = matchPattern' (mempty {eType = [(v, elts)]} <> subs) ps rest
+    withEVar (elts, rest) = matchPattern' (mempty {eType = [(v, elts)]} <> subs) ps rest
 matchPattern' subs ((PSt p) : ps) ((OSt o) : os) = do
   subs' <- matchPattern' subs p o
   matchPattern' subs' ps os

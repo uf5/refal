@@ -12,8 +12,7 @@ import qualified Language.Refal.BasisTypes as T
 
 data Symbol
   = SymBasic T.Symbol
-  | SymDQString String
-  | SymSQString String
+  | SymQString String
   deriving (Show)
 
 data PatternExpression

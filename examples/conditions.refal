@@ -1,0 +1,20 @@
+* From "REFAL-5 programming guide & reference manual" by Valentin F. Turchin: http://www.botik.ru/~scp/book/ch_4.1.html
+
+Pre-alph {
+    s1 s1 = T;
+    s1 s2, <Alphabet>: eA s1 eB s2 eC = T;
+    e1 = F;
+}
+
+Alphabet {
+    = 'abcdefghijklmnopqrstuvwxyz';
+}
+
+Main {
+    = <Prout
+            'af=' <Pre-alph 'af'> '\n' * T
+            'aa=' <Pre-alph 'aa'> '\n' * T
+            'fa=' <Pre-alph 'fa'> '\n' * F
+            'a=' <Pre-alph 'a'>        * F
+        >;
+}

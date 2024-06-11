@@ -117,6 +117,7 @@ desugarSentences ((S.ClauseSentence p x f) : rest) = do
   where
     filterVars [] = []
     filterVars ((S.PVar v) : xs) = v : filterVars xs
+    filterVars ((S.PSt elts) : xs) = filterVars elts <> filterVars xs
     filterVars (_ : xs) = filterVars xs
 
 desugarPE :: [S.PatternExpression] -> [T.PatternExpression]
@@ -125,8 +126,7 @@ desugarPE = concatMap desugarPE'
     desugarPE' (S.PSym s) =
       case s of
         S.SymBasic x -> [T.PSym x]
-        S.SymDQString x -> [T.PSt (map (T.PSym . T.Char) x)]
-        S.SymSQString x -> map (T.PSym . T.Char) x
+        S.SymQString x -> map (T.PSym . T.Char) x
     desugarPE' (S.PSt x) = [T.PSt (desugarPE x)]
     desugarPE' (S.PVar x) = [T.PVar x]
 
@@ -136,8 +136,7 @@ desugarRE = concatMap desugarRE'
     desugarRE' (S.RSym s) =
       case s of
         S.SymBasic x -> [T.RSym x]
-        S.SymDQString x -> [T.RSt (map (T.RSym . T.Char) x)]
-        S.SymSQString x -> map (T.RSym . T.Char) x
+        S.SymQString x -> map (T.RSym . T.Char) x
     desugarRE' (S.RSt x) = [T.RSt (desugarRE x)]
     desugarRE' (S.RVar x) = [T.RVar x]
     desugarRE' (S.RCall name args) = [T.RCall name (desugarRE args)]

@@ -1,0 +1,24 @@
+* From "REFAL-5 programming guide & reference manual" by Valentin F. Turchin: http://www.botik.ru/~scp/book/ch_5.2.html
+
+Sort {
+     = ;
+    sX e2 = <Sort1 (sX) e2>;
+}
+
+Sort1 {
+    (e1 tX) tY e2, <Compare tX tY>:
+                {
+                    '-' = <Sort1 (e1 tX tY) e2>;
+                    '+' = <Sort1 (e1) tY tX e2>;
+                };
+    (e1) = e1;
+}
+
+Sep {
+     = ;
+    tx es = tx ' ' <Sep es>;
+}
+
+Main {
+     = <Prout <Sep <Sort 3 73 66 99 29 10 91 5 76 43 42 39 33 8 51 38 41 86 97 94 54 65>>>;
+}
