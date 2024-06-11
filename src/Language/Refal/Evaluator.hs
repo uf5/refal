@@ -3,6 +3,7 @@
 
 module Language.Refal.Evaluator (evaluate, EvaluationError (..)) where
 
+import Control.Applicative.Combinators
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
@@ -233,11 +234,8 @@ apply (Builtin (HFunction f)) a = f a
 apply (UserDefined (RFunction sents)) a =
   fromMaybe
     (throwError NoMatchingPattern)
-    (firstJust (map evalSentence sents))
+    (choice (map evalSentence sents))
   where
-    firstJust [] = Nothing
-    firstJust (x@(Just _) : _) = x
-    firstJust (Nothing : xs) = firstJust xs
     evalSentence (Sentence p r) = runReaderT (eval r) <$> matchPattern p a
 
 eval :: [ResultExpression] -> ViewField Evaluator [ObjectExpression]

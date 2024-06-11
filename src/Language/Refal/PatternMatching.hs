@@ -1,10 +1,13 @@
 module Language.Refal.PatternMatching (matchPattern, Substitutions (..)) where
 
 import Control.Applicative.Combinators
+import Control.Monad
+import Control.Monad.State
+import qualified Data.List as List
 import Language.Refal.BasisTypes
 
 matchPattern :: [PatternExpression] -> [ObjectExpression] -> Maybe Substitutions
-matchPattern = matchPattern' mempty
+matchPattern ps os = matchPattern' ps os `execStateT` mempty
 
 data Substitutions = Substitutions
   { sType :: [(SVar, Symbol)],
@@ -21,34 +24,43 @@ instance Semigroup Substitutions where
 instance Monoid Substitutions where
   mempty = Substitutions {sType = mempty, tType = mempty, eType = mempty}
 
-matchPattern' :: Substitutions -> [PatternExpression] -> [ObjectExpression] -> Maybe Substitutions
-matchPattern' subs [] [] = pure subs
-matchPattern' subs ((PSym p) : ps) ((OSym o) : os)
-  | p == o = matchPattern' subs ps os
-  | otherwise = Nothing
-matchPattern' subs@Substitutions {sType = ss} ((PVar (SType v)) : ps) ((OSym sx) : os) =
-  case lookup v ss of
-    Just defined
-      | sx == defined -> matchPattern' subs ps os
-      | otherwise -> Nothing
-    Nothing -> matchPattern' (mempty {sType = [(v, sx)]} <> subs) ps os
-matchPattern' subs@Substitutions {tType = ts} ((PVar (TType v)) : ps) (ox : os) =
-  case lookup v ts of
-    Just defined
-      | ox == defined -> matchPattern' subs ps os
-      | otherwise -> Nothing
-    Nothing -> matchPattern' (mempty {tType = [(v, ox)]} <> subs) ps os
-matchPattern' subs@Substitutions {eType = es} ((PVar (EType v)) : ps) o =
-  case lookup v es of
-    Just defined
-      | let (elts, rest) = splitAt (length defined) o,
-        elts == defined ->
-          matchPattern' subs ps rest
-      | otherwise -> Nothing
-    Nothing -> choice $ map (withEVar . (`splitAt` o)) [0 .. length o]
+-- push substitution
+pushSType :: SVar -> Symbol -> Substitutions -> Substitutions
+pushSType v s ss@(Substitutions {sType = st}) = ss {sType = (v, s) : st}
+
+pushTType :: TVar -> ObjectExpression -> Substitutions -> Substitutions
+pushTType v t ss@(Substitutions {tType = tt}) = ss {tType = (v, t) : tt}
+
+pushEType :: EVar -> [ObjectExpression] -> Substitutions -> Substitutions
+pushEType v t ss@(Substitutions {eType = et}) = ss {eType = (v, t) : et}
+
+type Matcher a = StateT Substitutions Maybe a
+
+matchPattern' :: [PatternExpression] -> [ObjectExpression] -> Matcher ()
+matchPattern' [] [] = pure ()
+matchPattern' ((PSym p) : ps) ((OSym o) : os)
+  | p == o = matchPattern' ps os
+  | otherwise = lift Nothing
+matchPattern' ((PSt p) : ps) ((OSt o) : os) = matchPattern' p o *> matchPattern' ps os
+matchPattern' ((PVar (SType p)) : ps) ((OSym o) : os) =
+  ( gets (lookup p . sType)
+      >>= maybe
+        (modify $ pushSType p o)
+        ((`unless` lift Nothing) . (== o))
+  )
+    *> matchPattern' ps os
+matchPattern' ((PVar (TType p)) : ps) (o : os) =
+  ( gets (lookup p . tType)
+      >>= maybe
+        (modify $ pushTType p o)
+        ((`unless` lift Nothing) . (== o))
+  )
+    *> matchPattern' ps os
+matchPattern' ((PVar (EType p)) : ps) os =
+  gets (lookup p . eType)
+    >>= maybe
+      (choice $ map (withEVar . (`splitAt` os)) [0 .. length os])
+      (lift . (`List.stripPrefix` os) >=> matchPattern' ps)
   where
-    withEVar (elts, rest) = matchPattern' (mempty {eType = [(v, elts)]} <> subs) ps rest
-matchPattern' subs ((PSt p) : ps) ((OSt o) : os) = do
-  subs' <- matchPattern' subs p o
-  matchPattern' subs' ps os
-matchPattern' _ _ _ = Nothing
+    withEVar (elts, rest) = modify (pushEType p elts) *> matchPattern' ps rest
+matchPattern' _ _ = lift Nothing
