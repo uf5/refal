@@ -2,6 +2,7 @@
 This is an implementation of an Extended Refal interpreter in Haskell. Refal is a functional programming language, designed around pattern matching.
 
 # Running
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/uf5/refal?quickstart=1)
 ## Using Nix
 ```shell
 nix run
