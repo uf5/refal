@@ -30,6 +30,10 @@ library refal-lib
     Language.Refal.ExtendedTypes
     Language.Refal.Parser
     Language.Refal.PatternMatching
+    Language.Refal.PatternMatching.Implementations.Applicative
+    Language.Refal.PatternMatching.Implementations.Recursive
+    Language.Refal.PatternMatching.Implementations.State
+    Language.Refal.PatternMatching.Types
     Language.Refal.Syntax
 
 executable refal-exe

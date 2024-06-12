@@ -6,6 +6,18 @@ import Test.Hspec
 main :: IO ()
 main = hspec $ do
   describe "pattern matching" $ do
+    it "st" $ do
+      matchPattern
+        [PVar (SType (SVar "foo")), PSt [PVar (SType (SVar "foo")), PVar (SType (SVar "bar"))], PVar (SType (SVar "foo"))]
+        [OSym (Int 1), OSt [OSym (Int 1), OSym (Int 2)], OSym (Int 1)]
+        `shouldBe` Just
+          ( mempty
+              { sType =
+                  [ (SVar "bar", Int 2),
+                    (SVar "foo", Int 1)
+                  ]
+              }
+          )
     it "s-type" $ do
       matchPattern
         [PVar (SType (SVar "foo")), PVar (SType (SVar "bar")), PVar (SType (SVar "foo"))]
