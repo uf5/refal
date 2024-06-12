@@ -1,0 +1,14 @@
+Nested {
+    sx sy sz, <Add sx sy>: {
+        sz, <Compare sx sz>: {
+            "0" = sx;
+            "0" = sy;
+        };
+        s.args = "OTHERWISE";
+    };
+}
+
+Main {
+    = <Prout <Nested 0 0 0> "\n"
+             <Nested 0 1 0>>;
+}

@@ -21,4 +21,4 @@ matchPatternRecursive = ImpRecursive.matchPattern
 matchPatternState = ImpState.matchPattern
 
 -- default implementation
-matchPattern = matchPatternState
+matchPattern = matchPatternApplicative

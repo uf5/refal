@@ -29,11 +29,11 @@ withViewField v = local (\s -> s {viewField = v <> viewField s})
 withNamePrefix :: String -> Desugar a -> Desugar a
 withNamePrefix p = local (\s -> s {nameFn = ((p <> "-") <>) . nameFn s})
 
-patternPrefix :: Desugar [T.PatternExpression]
-patternPrefix = asks (map (T.PSt . singleton . T.PVar) . viewField)
+sentencePatternPrefix :: Desugar [T.PatternExpression]
+sentencePatternPrefix = asks (map (T.PSt . singleton . T.PVar) . viewField)
 
-resultPrefix :: Desugar [T.ResultExpression]
-resultPrefix = asks (map (T.RSt . singleton . T.RVar) . viewField)
+callPrefix :: Desugar [T.ResultExpression]
+callPrefix = asks (map (T.RSt . singleton . T.RVar) . viewField)
 
 pushNewAuxFunction :: T.RFunction -> Desugar String
 pushNewAuxFunction f = do
@@ -41,19 +41,25 @@ pushNewAuxFunction f = do
   modify $ \s -> s {auxFunctions = (n, f) : auxFunctions s}
   pure n
 
+pushNewAuxFunctionReturnCallMaker :: T.RFunction -> Desugar ([T.ResultExpression] -> T.ResultExpression)
+pushNewAuxFunctionReturnCallMaker f = do
+  n <- pushNewAuxFunction f
+  prefix <- callPrefix
+  pure (T.RCall n . (prefix <>))
+
 mkProgramFieldName :: Desugar String
 mkProgramFieldName = do
   DesugarEnv {programField = pf, nameFn = nf} <- ask
   DesugarState {auxFunctions = af} <- get
   pure $ fromJust $ find (`notElem` (pf <> map fst af)) (map nf [1 ..])
 
-mkViewFieldVar :: (String -> T.Var) -> Desugar T.Var
-mkViewFieldVar constructor = do
+mkFreeVar :: (String -> T.Var) -> Desugar T.Var
+mkFreeVar constructor = do
   DesugarEnv {viewField = vf} <- ask
   pure $ fromJust $ find (`notElem` vf) (map (constructor . ("var-aux-" <>) . show) [1 :: Int ..])
 
-mkEVar :: Desugar T.Var
-mkEVar = mkViewFieldVar (T.EType . T.EVar)
+mkFreeEVar :: Desugar T.Var
+mkFreeEVar = mkFreeVar (T.EType . T.EVar)
 
 desugarProgram :: S.Program -> T.Program
 desugarProgram (S.Program prog) =
@@ -89,30 +95,28 @@ desugarSentences [] = pure []
 desugarSentences ((S.Sentence p r) : rest) = do
   let p' = desugarPE p
   let r' = desugarRE r
-  pPrefix <- patternPrefix
+  pPrefix <- sentencePatternPrefix
   let sentence = T.Sentence (pPrefix <> p') r'
   (sentence :) <$> desugarSentences rest
 desugarSentences ((S.ClauseSentence p x f) : rest) = do
+  pprefix <- sentencePatternPrefix
   let p' = desugarPE p
   let x' = desugarRE x
   -- Rest
-  restFnName <- withNamePrefix "rest" $ do
+  restCallMaker <- withNamePrefix "rest" $ do
     sents <- desugarSentences rest
-    pushNewAuxFunction (T.RFunction sents)
+    pushNewAuxFunctionReturnCallMaker (T.RFunction sents)
   -- Clause
   let patternVars = filterVars p
-  (clauseFnName, clauseCallPrefix) <- withNamePrefix "clause" $ withViewField patternVars $ do
-    clauseFnName <- do
-      (T.RFunction sents) <- desugarFunction f
-      restArgsVar <- mkEVar
-      let restCallSentence = T.Sentence [T.PVar restArgsVar] [T.RCall restFnName [T.RVar restArgsVar]]
-      let clauseFunction = T.RFunction (sents <> [restCallSentence])
-      pushNewAuxFunction clauseFunction
-    clauseCallPrefix <- resultPrefix
-    pure (clauseFnName, clauseCallPrefix)
-  let clauseCallSentence = T.Sentence p' [T.RCall clauseFnName (clauseCallPrefix <> x')]
-  restArgsVar <- mkEVar
-  let restCallSentence = T.Sentence [T.PVar restArgsVar] [T.RCall restFnName [T.RVar restArgsVar]]
+  clauseCallMaker <- withNamePrefix "clause" $ withViewField patternVars $ do
+    (T.RFunction sents) <- desugarFunction f
+    restArgsVar <- mkFreeEVar
+    let restCallSentence = T.Sentence (pprefix <> [T.PVar restArgsVar]) [restCallMaker [T.RVar restArgsVar]]
+    let clauseFunction = T.RFunction (sents <> [restCallSentence])
+    pushNewAuxFunctionReturnCallMaker clauseFunction
+  let clauseCallSentence = T.Sentence (pprefix <> p') [clauseCallMaker x']
+  restArgsVar <- mkFreeEVar
+  let restCallSentence = T.Sentence (pprefix <> [T.PVar restArgsVar]) [restCallMaker [T.RVar restArgsVar]]
   pure [clauseCallSentence, restCallSentence]
   where
     filterVars [] = []
