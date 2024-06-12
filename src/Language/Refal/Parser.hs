@@ -87,7 +87,7 @@ pSentence = do
   (pBasic <?> "sentence") <|> (pClause <?> "clause")
 
 pFunctionBody :: Parser S.Function
-pFunctionBody = betweenLexeme (char '{') (char '}') (S.Function <$> some (pSentence <* lexeme (char ';'))) <?> "function body"
+pFunctionBody = betweenLexeme (char '{') (char '}') (S.Function <$> many (pSentence <* lexeme (char ';'))) <?> "function body"
 
 pFunction :: Parser (String, S.Function)
 pFunction = (,) <$> pFunctionName <*> pFunctionBody

@@ -17,7 +17,7 @@ main = do
       case result of
         Left err ->
           let (m, t) = showError err
-           in hPutStrLn stderr ("Error: " <> m <> "\n" <> unlines (map ("  at " <>) t))
+           in hPutStrLn stderr ("Error: " <> m <> "\n" <> unlines (reverse (map ("  at " <>) t)))
         Right _ -> pure ()
   where
     fromString = OSt . map (OSym . Char)
