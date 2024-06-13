@@ -43,7 +43,7 @@ betweenLexeme :: Parser sur -> Parser sur -> Parser inner -> Parser inner
 betweenLexeme = between `on` lexeme
 
 pFnName :: Parser String
-pFnName = lexeme ((:) <$> satisfy Char.isUpper <*> some allowedChar) <?> "function name"
+pFnName = lexeme ((:) <$> satisfy Char.isUpper <*> many allowedChar) <?> "function name"
 
 pSym :: Parser S.Symbol
 pSym = lexeme (choice [pInt, pChar, pIdentifier] <?> "symbol")
